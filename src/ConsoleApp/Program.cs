@@ -1,22 +1,246 @@
-﻿// See https://aka.ms/new-console-template for more information
-//Console.WriteLine("Hello, World!");
+﻿using System;
+using System.Collections.Generic;
+using System.Security.Cryptography;
+using System.Text;
+
+using Org.BouncyCastle.Crypto.Digests;
+using Org.BouncyCastle.Utilities.Encoders;
 
 using SatoshiSharpLib;
-using System;
-
 
 namespace main
 {
+
+
     public class SatoshiSharp
     {
+        public static byte[] OP_HASH160(byte[] input)
+        {
+            // 1. SHA-256
+            byte[] sha256Hash = SHA256.Create().ComputeHash(input);
+
+            // 2. RIPEMD-160
+            //using (var ripemd160 = new RIPEMD160())
+            //{
+            //    byte[] ripemd160Hash = ripemd160.ComputeHash(sha256Hash);
+            //    return ripemd160Hash;
+            //}
+            return null;
+        }
+
+        public static byte[] OP_HASH160(string input)
+        {
+            byte[] bytes = Encoding.UTF8.GetBytes(input);
+            return OP_HASH160(bytes);
+
+        }
         static void Main(string[] args)
         {
             Console.WriteLine("Go!");
 
             Wallet wallet = new Wallet();
             wallet.g = 6;
-        
+
+              string scriptHex = "410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac";
+            //second bitcoin transaction     41   0496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858ee  ac   reward 50 BTC
+            //410496B538E853519C726A2C91E61EC11600AE1390813A627C66FB8BE7947BE63C52DA7589379515D4E0A604F8141781E62294721166BF621E73A82CBF2342C858EEAC}
+            //ScriptPubKey: 410496B538E853519C726A2C91E61EC11600AE1390813A627C66FB8BE7947BE63C52DA7589379515D4E0A604F8141781E62294721166BF621E73A82CBF2342C858EEAC}
+            //0496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858ee
+            // to 12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX =
+            //                             0011  9b098e2e980a229e139a9ed01a469e518e6f2690afe11c
+
+
+            /*
+             * OP_DUP OPHASH160 <119B098E2E980A229E139A9ED01A469E518E6F26> OP_EQUALVERIFY OP_CHECKSIG
+               becomes --> 12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX
+             */
+
+
+            /*
+  1 - Public ECDSA Key
+0496B538E853519C726A2C91E61EC11600AE1390813A627C66FB8BE7947BE63C52DA7589379515D4E0A604F8141781E62294721166BF621E73A82CBF2342C858EE
+2 - SHA-256 hash of 1
+6527751DD9B3C2E5A2EE74DB57531AE419C786F5B54C165D21CDDDF04735281F
+3 - RIPEMD-160 Hash of 2
+119B098E2E980A229E139A9ED01A469E518E6F26
+4 - Adding network bytes to 3
+00119B098E2E980A229E139A9ED01A469E518E6F26
+5 - SHA-256 hash of 4
+D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
+6 - SHA-256 hash of 5
+90AFE11C54D3BF6BACD6BF92A3F46EECBE9316DC1AF9287791A25D340E67F535
+7 - First four bytes of 6
+90AFE11C
+8 - Adding 7 at the end of 4
+00119B098E2E980A229E139A9ED01A469E518E6F2690AFE11C
+9 - Base58 encoding of 8
+12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX
+             */
+
+
+            // trevors transaction send 732                                01976a91491c794eb0d1b7760639b7c5a863521b09c31d4de88ac00000000
+            //base58.b58decode_int('1EHp4zm1T2yUyjEmW3H4qauTJiVEXan3Uf'))[2:-8] = 0091C794EB0D1B7760639B7C5A863521B09C31D4DE    remove last eight 8D97C3A4
+
+            {
+                byte[] addressbytes = Helpers.Base58Decode("1EHp4zm1T2yUyjEmW3H4qauTJiVEXan3Uf");
+                string hexAddressWithExtra = Helpers.ByteArrayToHexString(addressbytes);
+                Console.WriteLine(hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8)));
+            }
+
+            {
+                string addressOriginalBtc = "12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX";
+                byte[] addressbytes = Helpers.Base58Decode(addressOriginalBtc);
+                string hexAddressWithExtra = Helpers.ByteArrayToHexString(addressbytes);
+                Console.WriteLine(hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8))); //119B098E2E980A229E139A9ED01A469E518E6F26
+                Console.WriteLine(hexAddressWithExtra); // 00119B098E2E980A229E139A9ED01A469E518E6F2690AFE11C   version in front plus 8 checksum
+                Console.WriteLine(hexAddressWithExtra); 
+            }
+
+            
+            {
+                string pubKeyHex = "0496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858ee";
+                byte[] pubKeyBytes = Hex.Decode(pubKeyHex);
+
+                // Step 1: SHA-256
+                SHA256 sha256 = SHA256.Create();
+                byte[] sha256Hash = sha256.ComputeHash(pubKeyBytes);
+
+                // Step 2: RIPEMD-160
+                RipeMD160Digest ripemd160 = new RipeMD160Digest();
+                ripemd160.BlockUpdate(sha256Hash, 0, sha256Hash.Length);
+                byte[] ripemdHash = new byte[ripemd160.GetDigestSize()];
+                ripemd160.DoFinal(ripemdHash, 0);
+                Console.WriteLine(Helpers.ByteArrayToHexString(ripemdHash)); // got to here I think  119B098E2E980A229E139A9ED01A469E518E6F26
+
+                // Step 3: Add version byte (0x00 for mainnet)
+                byte[] versionedPayload = new byte[ripemdHash.Length + 1];
+                versionedPayload[0] = 0x00;
+                Array.Copy(ripemdHash, 0, versionedPayload, 1, ripemdHash.Length);
+
+                Console.WriteLine(Helpers.ByteArrayToHexString(versionedPayload));
+
+                // Step 4: Double SHA-256 for checksum
+                byte[] checksum = sha256.ComputeHash(sha256.ComputeHash(versionedPayload));  // expected checksum 90AFE11C
+
+                // Step 5: Base58Check encode
+                Console.WriteLine(Helpers.ByteArrayToHexString(checksum).Substring(0,8));
+
+                string importantPartOfChecksum = Helpers.ByteArrayToHexString(checksum).Substring(0, 8);
+
+                string addressOriginalBtc = "12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX";
+                Console.WriteLine("Bitcoin Address: " + addressOriginalBtc);
+                byte[] addressbytes = Helpers.Base58Decode(addressOriginalBtc);
+                string hexAddressWithExtra = Helpers.ByteArrayToHexString(addressbytes);
+                Console.WriteLine(hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8))); //119B098E2E980A229E139A9ED01A469E518E6F26
+
+                string mainPartOfAddress = hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8));
+
+                string fullAddressInHex = "00" + mainPartOfAddress + importantPartOfChecksum;
+                Console.WriteLine(fullAddressInHex);
+
+                string j = Helpers.Base58Encode(Helpers.HexToBytes(fullAddressInHex));
+                //                                                  00119B098E2E980A229E139A9ED01A469E518E6F26 90AFE11C  this is correct
+                // not sure what this is                            00119B098E2E980A229E139A9ED01A469E518E6F268D97C3A4 WRONG
+                Console.WriteLine(j);
+
+
+
+
+                Console.WriteLine("Bitcoin Address: ");
+            }
+
+            Console.WriteLine("here");
+
+            //string ripe160Hash = RIPEMD160Hash.Compute(Helpers.PrintHexPreview(sha256Hash2)); //Helpers.PrintHexPreview(sha256Hash));
+            //Console.WriteLine((ripe160Hash));
+
+            // 3. Add version byte (0x00 for mainnet)
+            /*byte[] versionedPayload = new byte[1 + ripe160Hash.Length];
+            versionedPayload[0] = 0x00;
+            Buffer.BlockCopy(ripe160Hash, 0, versionedPayload, 1, ripe160Hash.Length);
+
+            // 4. Double SHA256 for checksum
+            byte[] checksum = SHA256.Create().ComputeHash(SHA256.Create().ComputeHash(versionedPayload)).Take(4).ToArray();
+
+            // 5. Concatenate versionedPayload + checksum
+            byte[] finalPayload = versionedPayload.Concat(checksum).ToArray();
+
+            // 6. Base58Check encode
+            string address = Helpers.Base58Encode(finalPayload);
+
+            /*Console.WriteLine($"Bitcoin address: {address}");
+                        string filePath = "..\\..\\xor.dat"; // Replace with your actual path
+
+            try
+            {
+                byte[] bytes = ReadFirstNBytes(filePath, 8);
+                Console.WriteLine("First 100 bytes in hex:");
+                PrintHex(bytes);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error reading file: {ex.Message}");
+            }*/
+
+            BlockReader bdf = new BlockReader();
+
+            //byte[] key = new byte[8];
+            byte[] key = new byte[] { 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 };
+
+            List<Wallet> wallets = new List<Wallet>();
+
+            string path = "..\\..\\..\\..\\..\\btcblockdata\\blk00000.dat";
+
+            bdf.ReadBlkDataFile(wallets, path, key, limit:100);
+
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[0].header.PrevBlock)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[1].header.PrevBlock)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[2].header.PrevBlock)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[3].header.PrevBlock)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[4].header.PrevBlock)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[5].header.PrevBlock)));
+
+
+            //PrintHexPreview(bdf.data, 300);
+
+            var v = Helpers.BitcoinBase58AddressToHexString("12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX");
+
+            var b  = Helpers.BitcoinBase58AddressToHexString("1EHp4zm1T2yUyjEmW3H4qauTJiVEXan3Uf");
+
+            Console.WriteLine(v);
+
+            //string filePath = "..\\..\\..\\..\\..\\btcblockdata\\blk00000.dat"; // path to bitcoin blockchain data
+            //string hexString = File.ReadAllText(filePath).Trim();
+            /*byte[] bytes = File.ReadAllBytes(path);
+            string hexString = BitConverter.ToString(bytes).Replace("-", "");
+
+
+
+            byte[] byteArray = new byte[hexString.Length / 2];
+            Console.WriteLine("byte size of entire block:" + (hexString.Length / 2));
+            for (int i = 0; i < byteArray.Length-1; i++)
+            {
+                string hexByte = hexString.Substring(i * 2, 2);
+                byteArray[i] = Convert.ToByte(hexByte, 16);
+            }
+
+            // Example: Print bytes
+            Console.WriteLine(BitConverter.ToString(byteArray));*/
+
+            //var block = Header.Parse(byteArray);
+            //Console.WriteLine(block);
+            
+
+
+
+
+
+
+
+
             Console.WriteLine("End\n");
         }
     }
 }
+
+
