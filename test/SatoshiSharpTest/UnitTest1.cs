@@ -10,9 +10,9 @@ public class SatoshiSharpTest
     [Fact]
     public void Test1()
     {
-        Wallet w = new Wallet();
-        w.g = 6;
-        Assert.Equal(6, w.g);
+        Wallet w = new Wallet { AddressBase58 = "", AddressHex = "", Transactions = new List<WalletTransaction>()};
+        
+        Assert.Equal("", w.AddressHex);
     }
 
     [Fact]

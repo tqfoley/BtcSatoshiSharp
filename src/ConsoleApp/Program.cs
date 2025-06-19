@@ -38,8 +38,8 @@ namespace main
         {
             Console.WriteLine("Go!");
 
-            Wallet wallet = new Wallet();
-            wallet.g = 6;
+            Wallet wallet = new Wallet { AddressBase58 = "", AddressHex = "", Transactions = new List<WalletTransaction>()};
+            
 
               string scriptHex = "410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac";
             //second bitcoin transaction     41   0496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858ee  ac   reward 50 BTC

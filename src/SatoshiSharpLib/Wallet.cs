@@ -4,37 +4,42 @@ namespace SatoshiSharpLib
 {
     public class WalletTransactionSpend
     {
-        public string sourceAddress;
-        public string destinationAddress;
-        public UInt64 amountSats;
-        public Wallet sourceWallet;
-        public Wallet destinationWallet;
+        public required string SourceAddress { get; set; }
+        public required string DestinationAddress { get; set; }
+        public required UInt64 AmountSats { get; set; }
+        public required Wallet SourceWallet { get; set; }
+        public required Wallet DestinationWallet { get; set; }
     }
 
     public class WalletTransaction
     {
-        public string transactionHash;
-        public UInt64 blockNumber;
-        public List<WalletTransactionSpend> spends;
+        public required string TransactionHash { get; set; }
+        public required UInt64 BlockNumber { get; set; }
+        public required List<WalletTransactionSpend> Spends { get; set; }
     }
 
     public class Wallet
     {
-        public int g;
-        public string AddressHex;
-        public string AddressBase58;
+        public Wallet()
+        {
+            AddressHex = string.Empty;
+            AddressBase58 = string.Empty;
+            Transactions = new List<WalletTransaction>();
+        }
+        
+        public required string AddressHex { get; set; }
+        public required string AddressBase58 { get; set; }
 
-        public UInt64 totalSpentSats;
-        public UInt64 currentSpendableSats;
-        public UInt64 totalReceivedSats;
+        public required List<WalletTransaction> Transactions { get; set; }
 
-        public UInt64 totalSentTransactionsCount;
-        public UInt64 totalReceivedTransactionsCount;
+        public UInt64 TotalSpentSats { get; set; }
+        public UInt64 CurrentSpendableSats { get; set; }
+        public UInt64 TotalReceivedSats { get; set; }
 
-        public UInt64 totalUniqueSentTransactionsCount; // hard to calculate need to search transactions
-        public UInt64 totalUniqueReceivedTransactionsCount; // hard to calculate need to search transactions
+        public UInt64 TotalSentTransactionsCount { get; set; }
+        public UInt64 TotalReceivedTransactionsCount { get; set; }
 
-        public List<WalletTransaction> transactions;
-
+        public UInt64 TotalUniqueSentTransactionsCount { get; set; } // hard to calculate need to search transactions
+        public UInt64 TotalUniqueReceivedTransactionsCount { get; set; } // hard to calculate need to search transactions
     }
-}
+} 
