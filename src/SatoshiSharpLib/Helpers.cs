@@ -1,13 +1,95 @@
 using System.Text;
+using System.Security.Cryptography;
 
 using Org.BouncyCastle.Math;
 using Org.BouncyCastle.Crypto.Digests;
+using Org.BouncyCastle.Utilities.Encoders;
 
 namespace SatoshiSharpLib
 {
 
     public class Helpers // the majority of this class generated with ChatGPT
     {
+        public static void readSignedSpend(int blockNumber, byte[] script, ulong valueSats, List<Wallet> stateWallets)
+        {
+            List<Spend> ret = new List<Spend>();
+
+            WalletAddress destinationAddress = new WalletAddress(0,0,0,0);
+
+            string scriptHex = ByteArrayToHexString(script);
+
+            string scriptHexTest = "410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac";
+
+
+            byte[] pubKeyBytes = Hex.Decode(scriptHex.Substring(2, scriptHex.Length - 4));
+
+            // Step 1: SHA-256
+            SHA256 sha256 = SHA256.Create();
+            byte[] sha256Hash = sha256.ComputeHash(pubKeyBytes);
+
+            // Step 2: RIPEMD-160
+            RipeMD160Digest ripemd160 = new RipeMD160Digest();
+            ripemd160.BlockUpdate(sha256Hash, 0, sha256Hash.Length);
+            byte[] ripemdHash = new byte[ripemd160.GetDigestSize()];
+            ripemd160.DoFinal(ripemdHash, 0);
+            Console.WriteLine(Helpers.ByteArrayToHexString(ripemdHash)); // got to here I think  119B098E2E980A229E139A9ED01A469E518E6F26
+
+            // Step 3: Add version byte (0x00 for mainnet)
+            byte[] versionedPayload = new byte[ripemdHash.Length + 1];
+            versionedPayload[0] = 0x00;
+            Array.Copy(ripemdHash, 0, versionedPayload, 1, ripemdHash.Length);
+
+            Console.WriteLine(Helpers.ByteArrayToHexString(versionedPayload));
+
+            // Step 4: Double SHA-256 for checksum
+            byte[] checksum = sha256.ComputeHash(sha256.ComputeHash(versionedPayload));  // expected checksum 90AFE11C
+
+            // Step 5: Base58Check encode
+            Console.WriteLine(Helpers.ByteArrayToHexString(checksum).Substring(0, 8));
+
+            string importantPartOfChecksum = Helpers.ByteArrayToHexString(checksum).Substring(0, 8);
+
+            //string addressOriginalBtc = "12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX";
+            //Console.WriteLine("Bitcoin Address: " + addressOriginalBtc);
+            //byte[] addressbytes = Helpers.Base58Decode(addressOriginalBtc);
+            //string hexAddressWithExtra = Helpers.ByteArrayToHexString(addressbytes);
+            //Console.WriteLine(hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8))); //119B098E2E980A229E139A9ED01A469E518E6F26
+            //string mainPartOfAddress = hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8));
+
+            byte[] f = Helpers.HexToBytes(Helpers.ByteArrayToHexString(versionedPayload) + importantPartOfChecksum);// "00119B098E2E980A229E139A9ED01A469E518E6F2690AFE11C");
+            
+
+            //WalletAddress = new()
+            string myaddress = Helpers.Base58Encode(f);
+
+            string myaddress2 = Helpers.Base58Encode(f);
+            byte[] g = Helpers.Base58Decode(myaddress2); //           01234567890123456789012345678901234567890123456789
+            string hexstring2 =  Helpers.ByteArrayToHexString(g); // "0062E907B15CBF27D5425399EBF6F0FB50EBB88F18C29B7D93"
+            string base58  = Helpers.Base58Encode(Helpers.HexToBytes(hexstring2));
+
+            string k = base58;
+
+            WalletAddress destinationWallet = new WalletAddress(hexstring2);
+
+            //string eee = g55.getHex();
+
+            //string eee2 = g55.getBase58();
+
+            var dest = StateWallets.getWallet(destinationWallet);
+            
+            if(dest == null)
+            {
+                stateWallets.Add(new Wallet(destinationWallet));
+            }
+
+            //WalletTransaction trevor
+            Transaction t = new Transaction { BlockNumber = 0, Spends = new List<Spend>()};
+
+            Spend s = new Spend(new WalletAddress(0, 0, 0, 0), destinationWallet, valueSats);
+
+            s.DestinationWallet = dest;
+
+        }
 
         public static string ReverseHexString(string hex)
         {

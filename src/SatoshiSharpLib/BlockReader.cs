@@ -13,7 +13,7 @@ namespace SatoshiSharpLib
 
         public List<Block> blocksInDataFile = new List<Block>();
 
-        public byte[] ReadBlkDataFile(List<Wallet> wallets, string FilePathSpecificToMyKey, byte[] key, int? limit=null)
+        public byte[] ReadBlkDataFile(string FilePathSpecificToMyKey, byte[] key, int? limit=null)
         {
             if (key.Length != 8)
             {
@@ -117,7 +117,7 @@ namespace SatoshiSharpLib
 
                                 Block.Transaction t = new Block.Transaction();
 
-                                Block.Transaction transaction = t.readTransactionBytes(reader2);
+                                Block.Transaction transaction = t.readTransactionBytes(StateWallets.Wallets, reader2);
 
                                 
 

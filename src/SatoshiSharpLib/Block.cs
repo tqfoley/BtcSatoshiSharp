@@ -168,7 +168,7 @@ vMerkleTree: 4a5e1e
 
              */
             
-            public Transaction readTransactionBytes(BinaryReader reader, bool printDebug = false)
+            public Transaction readTransactionBytes(List<Wallet> wallets, BinaryReader reader, bool printDebug = false)
             {
                 //using (MemoryStream ms = new MemoryStream(txBytes))
                 //using (BinaryReader reader = new BinaryReader(ms))
@@ -202,6 +202,8 @@ vMerkleTree: 4a5e1e
 
                         ulong scriptLength = Helpers.ReadVarInt(reader);
                         output.ScriptPubKey = reader.ReadBytes((int)scriptLength);
+
+                        Helpers.readSignedSpend(0, output.ScriptPubKey, 50, wallets);
 
                         tx.Outputs.Add(output);
                     }

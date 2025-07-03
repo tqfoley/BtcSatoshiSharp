@@ -38,7 +38,7 @@ namespace main
         {
             Console.WriteLine("Go!");
 
-            Wallet wallet = new Wallet { AddressBase58 = "", AddressHex = "", Transactions = new List<WalletTransaction>()};
+            Wallet wallet = new Wallet( new WalletAddress(0,0,0,0));// { AddressBase58 = "", AddressHex = "", Transactions = new List<WalletTransaction>()};
             
 
               string scriptHex = "410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac";
@@ -78,10 +78,10 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
              */
 
 
-            // trevors transaction send 732                                01976a91491c794eb0d1b7760639b7c5a863521b09c31d4de88ac00000000
+            // my transaction send 732 in python                                01976a91491c794eb0d1b7760639b7c5a863521b09c31d4de88ac00000000
             //base58.b58decode_int('1EHp4zm1T2yUyjEmW3H4qauTJiVEXan3Uf'))[2:-8] = 0091C794EB0D1B7760639B7C5A863521B09C31D4DE    remove last eight 8D97C3A4
 
-            {
+            /*{
                 byte[] addressbytes = Helpers.Base58Decode("1EHp4zm1T2yUyjEmW3H4qauTJiVEXan3Uf");
                 string hexAddressWithExtra = Helpers.ByteArrayToHexString(addressbytes);
                 Console.WriteLine(hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8)));
@@ -94,11 +94,16 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
                 Console.WriteLine(hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8))); //119B098E2E980A229E139A9ED01A469E518E6F26
                 Console.WriteLine(hexAddressWithExtra); // 00119B098E2E980A229E139A9ED01A469E518E6F2690AFE11C   version in front plus 8 checksum
                 Console.WriteLine(hexAddressWithExtra); 
-            }
+            }*/
 
             
             {
-                string pubKeyHex = "0496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858ee";
+                string firstzero = "04678AFDB0FE5548271967F1A67130B7105CD6A828E03909A67962E0EA1F61DEB649F6BC3F4CEF38C4F35504E51EC112DE5C384DF7BA0B8D578A4C702B6BF11D5F";
+                string pubKeyHex = //"0496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858ee";
+                                   "0496B538E853519C726A2C91E61EC11600AE1390813A627C66FB8BE7947BE63C52DA7589379515D4E0A604F8141781E62294721166BF621E73A82CBF2342C858EE";
+                //pubKeyHex = firstzero.ToLower();
+                string third =     "047211A824F55B505228E4C3D5194C1FCFAA15A456ABDF37F9B9D97A4040AFC073DEE6C89064984F03385237D92167C13E236446B417AB79A0FCAE412AE3316B77";
+                //pubKeyHex = third;
                 byte[] pubKeyBytes = Hex.Decode(pubKeyHex);
 
                 // Step 1: SHA-256
@@ -134,6 +139,12 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
                 Console.WriteLine(hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8))); //119B098E2E980A229E139A9ED01A469E518E6F26
 
                 string mainPartOfAddress = hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8));
+
+                byte[] f = Helpers.HexToBytes(Helpers.ByteArrayToHexString(versionedPayload) + importantPartOfChecksum);// "00119B098E2E980A229E139A9ED01A469E518E6F2690AFE11C");
+                string myaddress = Helpers.Base58Encode(f);
+
+                if (myaddress != addressOriginalBtc)
+                    throw new Exception("bad");
 
                 string fullAddressInHex = "00" + mainPartOfAddress + importantPartOfChecksum;
                 Console.WriteLine(fullAddressInHex);
@@ -187,11 +198,16 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
             //byte[] key = new byte[8];
             byte[] key = new byte[] { 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 };
 
-            List<Wallet> wallets = new List<Wallet>();
 
             string path = "..\\..\\..\\..\\..\\btcblockdata\\blk00000.dat";
 
-            bdf.ReadBlkDataFile(wallets, path, key, limit:100);
+            
+            StateWallets.Wallets = new List<Wallet>();
+
+            StateWallets.Wallets.Add(new Wallet(new WalletAddress(0, 0, 0, 0))); // add the reward wallet
+
+
+            bdf.ReadBlkDataFile(path, key, limit:100);
 
             Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[0].header.PrevBlock)));
             Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[1].header.PrevBlock)));
