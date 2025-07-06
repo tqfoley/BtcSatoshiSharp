@@ -8,11 +8,10 @@ namespace SatoshiSharpTest;
 public class SatoshiSharpTest
 {
     [Fact]
-    public void Test1()
+    public void Address0()
     {
-        Wallet w = new Wallet { AddressBase58 = "", AddressHex = "", Transactions = new List<WalletTransaction>()};
-        
-        Assert.Equal("", w.AddressHex);
+        Wallet w = new Wallet(new WalletAddress(0,0,0,0));
+        Assert.True( w.Address.getHex().Contains("00000000000000000000"));
     }
 
     [Fact]
@@ -20,9 +19,14 @@ public class SatoshiSharpTest
     {
         BlockReader bdf = new BlockReader();
         byte[] key = new byte[] { 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 };
-        List<Wallet> wallets = new List<Wallet>();
-        string path = "..\\..\\..\\..\\..\\btcblockdata\\blk00000.dat";
-        bdf.ReadBlkDataFile(wallets, path, key, limit: 100);
+        
+        StateWallets.Wallets =
+        [
+            new Wallet(new WalletAddress(0, 0, 0, 0)), // add the reward wallet
+        ];
+        string path = Path.Combine(Helpers.GetParentDirectory(".", 5), "btcblockdata", "blk00000.dat");
+        //string path = "..\\..\\..\\..\\..\\btcblockdata\\blk00000.dat";
+        bdf.ReadBlkDataFile(path, key, limit: 100);
         Assert.Equal("0000000000000000000000000000000000000000000000000000000000000000", Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[0].header.PrevBlock)));
     }
 
@@ -31,9 +35,16 @@ public class SatoshiSharpTest
     {
         BlockReader bdf = new BlockReader();
         byte[] key = new byte[] { 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 };
-        List<Wallet> wallets = new List<Wallet>();
-        string path = "..\\..\\..\\..\\..\\btcblockdata\\blk00000.dat";
-        bdf.ReadBlkDataFile(wallets, path, key, limit: 100);
+        
+        StateWallets.Wallets =
+        [
+            new Wallet(new WalletAddress(0, 0, 0, 0)), // add the reward wallet
+        ];
+        
+        string path = Path.Combine(Helpers.GetParentDirectory(".", 5), "btcblockdata", "blk00000.dat");
+            
+        //string path = "..\\..\\..\\..\\..\\btcblockdata\\blk00000.dat";
+        bdf.ReadBlkDataFile(path, key, limit: 100);
         Assert.Equal("00000000839A8E6886AB5951D76F411475428AFC90947EE320161BBF18EB6048", Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[2].header.PrevBlock)));
     }
 

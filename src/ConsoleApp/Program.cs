@@ -195,17 +195,14 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
 
             BlockReader bdf = new BlockReader();
 
-            //byte[] key = new byte[8];
             byte[] key = new byte[] { 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 };
 
-
-            string path = "..\\..\\..\\..\\..\\btcblockdata\\blk00000.dat";
-
+            string path = Path.Combine(Helpers.GetParentDirectory(".", 5), "btcblockdata", "blk00000.dat");
             
-            StateWallets.Wallets = new List<Wallet>();
-
-            StateWallets.Wallets.Add(new Wallet(new WalletAddress(0, 0, 0, 0))); // add the reward wallet
-
+            StateWallets.Wallets =
+            [
+                new Wallet(new WalletAddress(0, 0, 0, 0)), // add the reward wallet
+            ];
 
             bdf.ReadBlkDataFile(path, key, limit:100);
 

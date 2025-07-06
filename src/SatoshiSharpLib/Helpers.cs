@@ -10,11 +10,42 @@ namespace SatoshiSharpLib
 
     public class Helpers // the majority of this class generated with ChatGPT
     {
+
+        public static string GetParentDirectory(string path, int numberParents = 1)
+        {
+            string g = Directory.GetParent(path).FullName;
+            for (int i = 1; i < numberParents; i++)
+            {
+                g = Directory.GetParent(g).FullName;
+            }
+            return g;
+        }
+
+        public static List<string> GetAllFiles(string path)
+        {
+            List<string> ret = new List<string>();
+            try
+            {
+                Console.WriteLine("TREVOR trevor all files");
+                string[] files = Directory.GetFiles(path);
+
+                foreach (string file in files)
+                {
+                    ret.Add(file);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}\n");
+            }
+            return ret;
+        }
+
         public static void readSignedSpend(int blockNumber, byte[] script, ulong valueSats, List<Wallet> stateWallets)
         {
             List<Spend> ret = new List<Spend>();
 
-            WalletAddress destinationAddress = new WalletAddress(0,0,0,0);
+            WalletAddress destinationAddress = new WalletAddress(0, 0, 0, 0);
 
             string scriptHex = ByteArrayToHexString(script);
 
@@ -57,15 +88,15 @@ namespace SatoshiSharpLib
             //string mainPartOfAddress = hexAddressWithExtra.Substring(2, hexAddressWithExtra.Length - (2 + 8));
 
             byte[] f = Helpers.HexToBytes(Helpers.ByteArrayToHexString(versionedPayload) + importantPartOfChecksum);// "00119B098E2E980A229E139A9ED01A469E518E6F2690AFE11C");
-            
+
 
             //WalletAddress = new()
             string myaddress = Helpers.Base58Encode(f);
 
             string myaddress2 = Helpers.Base58Encode(f);
             byte[] g = Helpers.Base58Decode(myaddress2); //           01234567890123456789012345678901234567890123456789
-            string hexstring2 =  Helpers.ByteArrayToHexString(g); // "0062E907B15CBF27D5425399EBF6F0FB50EBB88F18C29B7D93"
-            string base58  = Helpers.Base58Encode(Helpers.HexToBytes(hexstring2));
+            string hexstring2 = Helpers.ByteArrayToHexString(g); // "0062E907B15CBF27D5425399EBF6F0FB50EBB88F18C29B7D93"
+            string base58 = Helpers.Base58Encode(Helpers.HexToBytes(hexstring2));
 
             string k = base58;
 
@@ -76,14 +107,14 @@ namespace SatoshiSharpLib
             //string eee2 = g55.getBase58();
 
             var dest = StateWallets.getWallet(destinationWallet);
-            
-            if(dest == null)
+
+            if (dest == null)
             {
                 stateWallets.Add(new Wallet(destinationWallet));
             }
 
             //WalletTransaction trevor
-            Transaction t = new Transaction { BlockNumber = 0, Spends = new List<Spend>()};
+            Transaction t = new Transaction { BlockNumber = 0, Spends = new List<Spend>() };
 
             Spend s = new Spend(new WalletAddress(0, 0, 0, 0), destinationWallet, valueSats);
 
