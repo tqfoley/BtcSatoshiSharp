@@ -42,6 +42,7 @@ Generated\ Files/
 
 # bitcoin block files since this is ~800 gigs
 btcblockdata\
+btcblockdata
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
