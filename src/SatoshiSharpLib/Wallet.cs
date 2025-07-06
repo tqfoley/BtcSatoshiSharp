@@ -129,6 +129,15 @@ namespace SatoshiSharpLib
             Console.WriteLine("wallet not found");
             return null;
         }
+
+        public static void PrintAllWalletsOrdered()
+        {
+            foreach (Wallet w in Wallets.OrderBy(x => x.CurrentSpendableSats).ToList())
+            {
+                Console.WriteLine(w.Address.getHex());
+                Console.WriteLine("  " + w.CurrentSpendableSats / Helpers.SatsInBTC);
+            }
+        }
     }
 
     public class Wallet

@@ -7,9 +7,11 @@ using Org.BouncyCastle.Utilities.Encoders;
 
 namespace SatoshiSharpLib
 {
-
     public class Helpers // the majority of this class generated with ChatGPT
     {
+
+        public static readonly UInt64 SatsInBTC = 100 * 1000 * 1000;
+
         public static void readSignedSpend(int blockNumber, byte[] script, ulong valueSats, List<Wallet> stateWallets)
         {
             List<Spend> ret = new List<Spend>();
