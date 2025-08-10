@@ -7,9 +7,10 @@ using Org.BouncyCastle.Utilities.Encoders;
 
 namespace SatoshiSharpLib
 {
-
     public class Helpers // the majority of this class generated with ChatGPT
     {
+
+        public static readonly UInt64 SatsInBTC = 100 * 1000 * 1000;
 
         public static string GetParentDirectory(string path, int numberParents = 1)
         {
@@ -49,7 +50,7 @@ namespace SatoshiSharpLib
 
             string scriptHex = ByteArrayToHexString(script);
 
-            string scriptHexTest = "410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac";
+            //string scriptHexTest = "410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac";
 
 
             byte[] pubKeyBytes = Hex.Decode(scriptHex.Substring(2, scriptHex.Length - 4));
@@ -115,6 +116,11 @@ namespace SatoshiSharpLib
 
             //WalletTransaction trevor
             Transaction t = new Transaction { BlockNumber = 0, Spends = new List<Spend>() };
+
+            if (blockNumber > 168)
+            {
+                Console.WriteLine("blocknumber " + blockNumber);
+            }
 
             Spend s = new Spend(new WalletAddress(0, 0, 0, 0), destinationWallet, valueSats);
 
@@ -243,7 +249,7 @@ namespace SatoshiSharpLib
             if (bytes.Length % 16 != 0)
                 Console.WriteLine();
         }
-        
+
         public static void PrintHexData(BinaryReader br, int maxBytes)
         {
             byte[] a = br.ReadBytes(maxBytes); // 0x10
@@ -358,6 +364,242 @@ namespace SatoshiSharpLib
             var decoded = Base58Decode(address);
             return BitConverter.ToString(decoded).Replace("-", "").ToLower();
         }
+
+        // written by Claude trevor TODO go over to do
+        public class BitcoinMerkleRootCalculatorClaude
+        {
+
+            /// <summary>
+            /// Calculate the Merkle root from a list of transaction IDs
+            /// </summary>
+            public static string CalculateMerkleRoot(List<string> transactionIds)
+            {
+                if (transactionIds == null || transactionIds.Count == 0)
+                    throw new ArgumentException("Transaction list cannot be empty");
+
+                // Convert hex strings to byte arrays (reverse for little-endian)
+                var hashes = transactionIds.Select(txId =>
+                {
+                    byte[] hash = HexStringToByteArray(txId);
+                    Array.Reverse(hash); // Bitcoin uses little-endian
+                    return hash;
+                }).ToList();
+
+                // Build the Merkle tree
+                while (hashes.Count > 1)
+                {
+                    hashes = BuildNextLevel(hashes);
+                }
+
+                // Convert final hash back to hex string (reverse back to big-endian for display)
+                byte[] merkleRoot = hashes[0];
+                Array.Reverse(merkleRoot);
+                return ByteArrayToHexString(merkleRoot);
+            }
+
+            /// <summary>
+            /// Build the next level of the Merkle tree
+            /// </summary>
+            private static List<byte[]> BuildNextLevel(List<byte[]> currentLevel)
+            {
+                var nextLevel = new List<byte[]>();
+
+                for (int i = 0; i < currentLevel.Count; i += 2)
+                {
+                    byte[] left = currentLevel[i];
+                    byte[] right;
+
+                    // If odd number of hashes, duplicate the last one (Bitcoin rule)
+                    if (i + 1 < currentLevel.Count)
+                    {
+                        right = currentLevel[i + 1];
+                    }
+                    else
+                    {
+                        right = currentLevel[i]; // Duplicate last hash
+                    }
+
+                    // Concatenate left and right, then double SHA-256
+                    byte[] combined = new byte[64]; // 32 + 32 bytes
+                    Array.Copy(left, 0, combined, 0, 32);
+                    Array.Copy(right, 0, combined, 32, 32);
+
+                    byte[] parentHash = DoubleSha256(combined);
+                    nextLevel.Add(parentHash);
+                }
+
+                return nextLevel;
+            }
+
+            /// <summary>
+            /// Perform double SHA-256 (SHA-256 of SHA-256)
+            /// </summary>
+            private static byte[] DoubleSha256(byte[] input)
+            {
+                using (SHA256 sha256 = SHA256.Create())
+                {
+                    byte[] firstHash = sha256.ComputeHash(input);
+                    return sha256.ComputeHash(firstHash);
+                }
+            }
+
+            /// <summary>
+            /// Convert hex string to byte array
+            /// </summary>
+            private static byte[] HexStringToByteArray(string hex)
+            {
+                if (hex.Length % 2 != 0)
+                    throw new ArgumentException("Hex string must have even length");
+
+                byte[] bytes = new byte[hex.Length / 2];
+                for (int i = 0; i < hex.Length; i += 2)
+                {
+                    bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
+                }
+                return bytes;
+            }
+
+            /// <summary>
+            /// Convert byte array to hex string
+            /// </summary>
+            private static string ByteArrayToHexString(byte[] bytes)
+            {
+                return BitConverter.ToString(bytes).Replace("-", "").ToLower();
+            }
+
+            /// <summary>
+            /// Demonstrate step-by-step Merkle tree calculation
+            /// </summary>
+            public static void DemonstrateStepByStep(List<string> transactionIds)
+            {
+                Console.WriteLine("Step-by-step Merkle Tree Calculation:");
+                Console.WriteLine($"Starting with {transactionIds.Count} transactions");
+
+                var hashes = transactionIds.Select(txId =>
+                {
+                    byte[] hash = HexStringToByteArray(txId);
+                    Array.Reverse(hash);
+                    return hash;
+                }).ToList();
+
+                int level = 0;
+                Console.WriteLine($"\nLevel {level} ({hashes.Count} hashes):");
+                for (int i = 0; i < hashes.Count; i++)
+                {
+                    byte[] displayHash = (byte[])hashes[i].Clone();
+                    Array.Reverse(displayHash);
+                    Console.WriteLine($"  [{i}]: {ByteArrayToHexString(displayHash)}");
+                }
+
+                while (hashes.Count > 1)
+                {
+                    hashes = BuildNextLevel(hashes);
+                    level++;
+
+                    Console.WriteLine($"\nLevel {level} ({hashes.Count} hashes):");
+                    for (int i = 0; i < hashes.Count; i++)
+                    {
+                        byte[] displayHash = (byte[])hashes[i].Clone();
+                        Array.Reverse(displayHash);
+                        Console.WriteLine($"  [{i}]: {ByteArrayToHexString(displayHash)}");
+                    }
+                }
+
+                byte[] finalRoot = (byte[])hashes[0].Clone();
+                Array.Reverse(finalRoot);
+                Console.WriteLine($"\nFinal Merkle Root: {ByteArrayToHexString(finalRoot)}");
+            }
+        }
+
+        /// <summary>
+        /// Helper class for building Merkle trees with detailed information
+        /// </summary>
+        public class MerkleTree
+        {
+            public class MerkleNode
+            {
+                public byte[] Hash { get; set; }
+                public MerkleNode Left { get; set; }
+                public MerkleNode Right { get; set; }
+                public bool IsLeaf => Left == null && Right == null;
+
+                public string HashHex
+                {
+                    get
+                    {
+                        byte[] displayHash = (byte[])Hash.Clone();
+                        Array.Reverse(displayHash);
+                        return BitConverter.ToString(displayHash).Replace("-", "").ToLower();
+                    }
+                }
+            }
+
+            public static MerkleNode BuildMerkleTree(List<string> transactionIds)
+            {
+                if (transactionIds == null || transactionIds.Count == 0)
+                    throw new ArgumentException("Transaction list cannot be empty");
+
+                // Create leaf nodes
+                var leafNodes = transactionIds.Select(txId =>
+                {
+                    byte[] hash = HexStringToByteArray(txId);
+                    Array.Reverse(hash);
+                    return new MerkleNode { Hash = hash };
+                }).ToList();
+
+                return BuildTreeFromNodes(leafNodes);
+            }
+
+            private static MerkleNode BuildTreeFromNodes(List<MerkleNode> nodes)
+            {
+                if (nodes.Count == 1)
+                    return nodes[0];
+
+                var nextLevel = new List<MerkleNode>();
+
+                for (int i = 0; i < nodes.Count; i += 2)
+                {
+                    var left = nodes[i];
+                    var right = (i + 1 < nodes.Count) ? nodes[i + 1] : nodes[i];
+
+                    // Create parent node
+                    byte[] combined = new byte[64];
+                    Array.Copy(left.Hash, 0, combined, 0, 32);
+                    Array.Copy(right.Hash, 0, combined, 32, 32);
+
+                    var parentNode = new MerkleNode
+                    {
+                        Hash = DoubleSha256(combined),
+                        Left = left,
+                        Right = right
+                    };
+
+                    nextLevel.Add(parentNode);
+                }
+
+                return BuildTreeFromNodes(nextLevel);
+            }
+
+            private static byte[] DoubleSha256(byte[] input)
+            {
+                using (var sha256 = SHA256.Create())
+                {
+                    byte[] firstHash = sha256.ComputeHash(input);
+                    return sha256.ComputeHash(firstHash);
+                }
+            }
+
+            private static byte[] HexStringToByteArray(string hex)
+            {
+                byte[] bytes = new byte[hex.Length / 2];
+                for (int i = 0; i < hex.Length; i += 2)
+                {
+                    bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
+                }
+                return bytes;
+            }
+        }
+
     }
 
 }

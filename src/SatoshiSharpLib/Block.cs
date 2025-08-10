@@ -1,4 +1,7 @@
 
+using Org.BouncyCastle.Utilities;
+using System.Text;
+
 namespace SatoshiSharpLib
 {
     public class Block
@@ -12,19 +15,34 @@ namespace SatoshiSharpLib
         public class Header
         {
             public uint Version { get; set; }
-            public byte[] PrevBlock { get; set; }   // 32 bytes
+            public byte[] PrevBlockHash { get; set; }   // 32 bytes
             public byte[] MerkleRoot { get; set; }  // 32 bytes
             public uint Timestamp { get; set; }
             public uint Bits { get; set; }
             public uint Nonce { get; set; }
             public ulong TransactionCount { get; set; }
 
+
+            public string ReverseRemoveDashAndToLower(byte[] a)
+            {
+                string b = BitConverter.ToString(a).Replace("-", "");
+                string c = Helpers.ReverseHexString(b).ToLower();
+                return c;
+            }
+
             public override string ToString()
             {
+                string prevBlockWithZerosAtEnd = BitConverter.ToString(PrevBlockHash).Replace("-", "");
+                string prevBlockMatchExplorers = Helpers.ReverseHexString(prevBlockWithZerosAtEnd).ToLower();
                 string hexBits = Bits.ToString("X8");
+
+
+
                 return $"Version: {Version}\n" +
-                       $"Previous Block: {BitConverter.ToString(PrevBlock).Replace("-", "")}\n" +
-                       $"Merkle Root: {BitConverter.ToString(MerkleRoot).Replace("-", "")}\n" +
+                       //$"Previous Block: {BitConverter.ToString(PrevBlock).Replace("-", "")}\n" +
+                       $"Previous Block: {prevBlockMatchExplorers}\n" +
+                       $"Merkle Root: {ReverseRemoveDashAndToLower(MerkleRoot)}\n" +
+                       $"Merkle Root Reversed: {BitConverter.ToString(MerkleRoot).Replace("-", "")}\n" +
                        $"Timestamp: {Timestamp} ({UnixTimeStampToDateTime(Timestamp)})\n" +
                        $"Bits: {hexBits}\n" +
                        $"Nonce: {Nonce}\n" +
@@ -45,7 +63,7 @@ namespace SatoshiSharpLib
                     header = new Header
                     {
                         Version = reader.ReadUInt32(),         // 4 bytes
-                        PrevBlock = reader.ReadBytes(32),      // 32 bytes
+                        PrevBlockHash = reader.ReadBytes(32),      // 32 bytes
                         MerkleRoot = reader.ReadBytes(32),     // 32 bytes
                         Timestamp = reader.ReadUInt32(),       // 4 bytes
                         Bits = reader.ReadUInt32(),            // 4 bytes
@@ -57,7 +75,18 @@ namespace SatoshiSharpLib
                 }
             }
 
-            private static ulong ReadVarInt(BinaryReader reader)
+            public string GetMerkleRootAsString()
+            {
+                return Helpers.ReverseHexString(
+                    Helpers.ByteArrayToHexString(MerkleRoot));
+            }
+            public string GetPrevBlockHashAsString()
+            {
+                return Helpers.ReverseHexString(Helpers.ByteArrayToHexString(PrevBlockHash));
+                //return Encoding.UTF8.GetString(PrevBlockHash);
+            }
+
+            /*private static ulong ReadVarInt(BinaryReader reader)
             {
                 byte prefix = reader.ReadByte();
 
@@ -81,7 +110,7 @@ namespace SatoshiSharpLib
                 {
                     throw new Exception("Invalid VarInt prefix");
                 }
-            }
+            }*/
         }
 
         public class Transaction
@@ -168,7 +197,7 @@ vMerkleTree: 4a5e1e
 
              */
             
-            public Transaction readTransactionBytes(List<Wallet> wallets, BinaryReader reader, bool printDebug = false)
+            public Transaction readTransactionBytes(List<Wallet> wallets, BinaryReader reader, int blockNumber, bool printDebug = false)
             {
                 //using (MemoryStream ms = new MemoryStream(txBytes))
                 //using (BinaryReader reader = new BinaryReader(ms))
@@ -177,6 +206,11 @@ vMerkleTree: 4a5e1e
                     tx.Version = reader.ReadUInt32();
 
                     ulong inputCount = Helpers.ReadVarInt(reader);
+                    if (inputCount == 2)
+                    {
+                        Console.WriteLine("two inputs");
+                    }
+
                     for (ulong i = 0; i < inputCount; i++)
                     {
                         TxInput input = new TxInput
@@ -184,7 +218,9 @@ vMerkleTree: 4a5e1e
                             TxId = reader.ReadBytes(32),
                             Vout = reader.ReadUInt32()
                         };
-
+                        //              my program    F4184FC596403B9D638783CF57ADFE4C75C605F6356FBC91338530E9831E9E16
+                        // block 181  2nd transaction a16f3ce4dd5deb92d98ef5cf8afeaf0775ebca408f708b2146c4fb42b41e14be
+                        // 0411db93e1dcdb8a016b49840f8c53bc1eb68a382e97b1482ecad7b148a6909a5cb2e0eaddfb84ccf9744464f82e160bfa9b8b64f9d4c03f999b8643f656b412a3
                         ulong scriptLength = Helpers.ReadVarInt(reader);
                         input.ScriptSig = reader.ReadBytes((int)scriptLength);
                         input.Sequence = reader.ReadUInt32();
@@ -193,6 +229,10 @@ vMerkleTree: 4a5e1e
                     }
 
                     ulong outputCount = Helpers.ReadVarInt(reader);
+                    if(outputCount == 2)
+                    {
+                        Console.WriteLine("two outputs");
+                    }
                     for (ulong i = 0; i < outputCount; i++)
                     {
                         TxOutput output = new TxOutput
@@ -203,7 +243,7 @@ vMerkleTree: 4a5e1e
                         ulong scriptLength = Helpers.ReadVarInt(reader);
                         output.ScriptPubKey = reader.ReadBytes((int)scriptLength);
 
-                        Helpers.readSignedSpend(0, output.ScriptPubKey, 50, wallets);
+                        Helpers.readSignedSpend(blockNumber, output.ScriptPubKey, 50, wallets);
 
                         tx.Outputs.Add(output);
                     }

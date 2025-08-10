@@ -2,11 +2,11 @@
 using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
-
 using Org.BouncyCastle.Crypto.Digests;
 using Org.BouncyCastle.Utilities.Encoders;
 
 using SatoshiSharpLib;
+using static SatoshiSharpLib.Helpers;
 
 namespace main
 {
@@ -96,7 +96,8 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
                 Console.WriteLine(hexAddressWithExtra); 
             }*/
 
-            
+
+
             {
                 string firstzero = "04678AFDB0FE5548271967F1A67130B7105CD6A828E03909A67962E0EA1F61DEB649F6BC3F4CEF38C4F35504E51EC112DE5C384DF7BA0B8D578A4C702B6BF11D5F";
                 string pubKeyHex = //"0496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858ee";
@@ -204,14 +205,15 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
                 new Wallet(new WalletAddress(0, 0, 0, 0)), // add the reward wallet
             ];
 
-            bdf.ReadBlkDataFile(path, key, limit:100);
+            int blockNumberOffset = 0;
+            bdf.ReadBlkDataFile(path, key, blockNumberOffset, limit:180);
 
-            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[0].header.PrevBlock)));
-            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[1].header.PrevBlock)));
-            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[2].header.PrevBlock)));
-            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[3].header.PrevBlock)));
-            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[4].header.PrevBlock)));
-            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[5].header.PrevBlock)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[0].header.PrevBlockHash)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[1].header.PrevBlockHash)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[2].header.PrevBlockHash)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[3].header.PrevBlockHash)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[4].header.PrevBlockHash)));
+            Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[5].header.PrevBlockHash)));
 
 
             //PrintHexPreview(bdf.data, 300);
