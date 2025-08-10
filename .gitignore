@@ -42,6 +42,7 @@ Generated\ Files/
 
 # bitcoin block files since this is ~800 gigs
 btcblockdata\
+btcblockdata
 
 # MSTest test Results
 [Tt]est[Rr]esult*/
@@ -131,6 +132,15 @@ $tf/
 
 # Guidance Automation Toolkit
 *.gpState
+
+# macOS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # ReSharper is a .NET coding add-in
 _ReSharper*/
