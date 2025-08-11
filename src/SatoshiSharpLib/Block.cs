@@ -1,6 +1,7 @@
 
 using Org.BouncyCastle.Utilities;
 using System.Text;
+using System.Security.Cryptography;
 
 namespace SatoshiSharpLib
 {
@@ -22,6 +23,62 @@ namespace SatoshiSharpLib
             public uint Nonce { get; set; }
             public ulong TransactionCount { get; set; }
 
+
+            public static string CalculateBlockHash(Block.Header blockHeader)
+            {
+                // Convert block header to bytes
+                byte[] headerBytes = SerializeBlockHeader(blockHeader);
+
+                // Bitcoin uses double SHA-256 (SHA-256 of SHA-256)
+                using (SHA256 sha256 = SHA256.Create())
+                {
+                    byte[] firstHash = sha256.ComputeHash(headerBytes);
+                    byte[] secondHash = sha256.ComputeHash(firstHash);
+
+                    // Reverse bytes for little-endian display (Bitcoin convention)
+                    Array.Reverse(secondHash);
+
+                    // Convert to hexadecimal string
+                    return BitConverter.ToString(secondHash).Replace("-", "").ToLower();
+                }
+            }
+
+            public static byte[] SerializeBlockHeader(Block.Header header)
+            {
+                var bytes = new byte[80]; // Bitcoin block header is always 80 bytes
+                int offset = 0;
+
+                // Version (4 bytes, little-endian)
+                Helpers.WriteUInt32LE(bytes, offset, (uint)header.Version);
+                offset += 4;
+
+                // Previous block hash (32 bytes, little-endian)
+                byte[] prevHashBytes = Helpers.HexToBytes(header.GetPrevBlockHashAsString()); // toDo trevor to do don't convert to string and back
+                Array.Reverse(prevHashBytes); // Convert to little-endian
+                Array.Copy(prevHashBytes, 0, bytes, offset, 32);
+                offset += 32;
+
+                // Merkle root (32 bytes, little-endian)
+                byte[] merkleBytes = Helpers.HexToBytes(header.GetMerkleRootAsString()); // toDo trevor to do don't convert to string and back
+                Array.Reverse(merkleBytes); // Convert to little-endian
+                Array.Copy(merkleBytes, 0, bytes, offset, 32);
+                offset += 32;
+
+                // Timestamp (4 bytes, little-endian)
+                Helpers.WriteUInt32LE(bytes, offset, (uint)header.Timestamp);
+                offset += 4;
+
+                // Bits (4 bytes, little-endian)
+                Helpers.WriteUInt32LE(bytes, offset, header.Bits);
+                offset += 4;
+
+                // Nonce (4 bytes, little-endian)
+                Helpers.WriteUInt32LE(bytes, offset, header.Nonce);
+
+                string j = Helpers.ByteArrayToHexString(bytes);
+
+                return bytes;
+            }
 
             public string ReverseRemoveDashAndToLower(byte[] a)
             {

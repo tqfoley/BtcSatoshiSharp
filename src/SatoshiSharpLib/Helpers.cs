@@ -542,7 +542,7 @@ namespace SatoshiSharpLib
                 // Create leaf nodes
                 var leafNodes = transactionIds.Select(txId =>
                 {
-                    byte[] hash = HexStringToByteArray(txId);
+                    byte[] hash = Helpers.HexToBytes(txId);
                     Array.Reverse(hash);
                     return new MerkleNode { Hash = hash };
                 }).ToList();
@@ -589,7 +589,7 @@ namespace SatoshiSharpLib
                 }
             }
 
-            private static byte[] HexStringToByteArray(string hex)
+            /*private static byte[] HexStringToByteArray(string hex)
             {
                 byte[] bytes = new byte[hex.Length / 2];
                 for (int i = 0; i < hex.Length; i += 2)
@@ -597,7 +597,30 @@ namespace SatoshiSharpLib
                     bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
                 }
                 return bytes;
+            }*/
+        }
+
+        /*
+        private static byte[] HexStringToByteArray(string hex)
+        {
+            if (hex.Length % 2 != 0)
+                throw new ArgumentException("Hex string must have even length");
+
+            byte[] bytes = new byte[hex.Length / 2];
+            for (int i = 0; i < hex.Length; i += 2)
+            {
+                bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
             }
+            return bytes;
+        }*/
+
+
+        public static void WriteUInt32LE(byte[] buffer, int offset, uint value)
+        {
+            buffer[offset] = (byte)(value & 0xFF);
+            buffer[offset + 1] = (byte)((value >> 8) & 0xFF);
+            buffer[offset + 2] = (byte)((value >> 16) & 0xFF);
+            buffer[offset + 3] = (byte)((value >> 24) & 0xFF);
         }
 
     }
