@@ -115,7 +115,7 @@ namespace SatoshiSharpLib
             }
 
             //WalletTransaction trevor
-            Transaction t = new Transaction { BlockNumber = 0, Spends = new List<Spend>() };
+            TransactionDELETEME t = new TransactionDELETEME { BlockNumber = 0, Spends = new List<Spend>() };
 
             if (blockNumber > 168)
             {
@@ -126,6 +126,28 @@ namespace SatoshiSharpLib
 
             s.DestinationWallet = dest;
 
+        }
+
+        public static string GetStringReverseHexBytes(byte[] hexBytes)
+        {
+            string hex = Helpers.ByteArrayToHexString(hexBytes);
+            if (string.IsNullOrEmpty(hex) || hex.Length % 2 != 0)
+                throw new ArgumentException("Hex string must have an even number of characters.");
+
+            int byteCount = hex.Length / 2;
+            string[] bytePairs = new string[byteCount];
+
+            // Break into byte-sized chunks
+            for (int i = 0; i < byteCount; i++)
+            {
+                bytePairs[i] = hex.Substring(i * 2, 2);
+            }
+
+            // Reverse the byte order
+            Array.Reverse(bytePairs);
+
+            // Join into final hex string
+            return string.Join("", bytePairs);
         }
 
         public static string ReverseHexString(string hex)

@@ -112,11 +112,18 @@ namespace SatoshiSharpLib
                     using (MemoryStream ms2 = new MemoryStream(reader.ReadBytes((int)BlockSize)))
                     using (BinaryReader reader2 = new BinaryReader(ms2))
                     {
+
+                        List<byte[]> transationsListAsBytes = new List<byte[]>();
+
                         //Helpers.PrintHexData(reader2, (int)BlockSize);
                         //loop here to do todo trevor
-                        Block newBlock = new Block();
+                        Block newCurrentBlock = new Block();
                         {
-                            newBlock.header = Block.Header.Parse(reader2.ReadBytes(80));
+                            if (blockNumber >= 193)
+                            {
+                                Console.WriteLine("block 193");
+                            }
+                            newCurrentBlock.header = Block.Header.Parse(reader2.ReadBytes(80));
                             //reader2.ReadBytes(80);
 
                             ulong TransactionCount = Helpers.ReadVarInt(reader2);  // In some cases 2 bytes like values 0 or 1
@@ -130,25 +137,64 @@ namespace SatoshiSharpLib
                             for (ulong i = 0; i < TransactionCount; i++)
                             {
 
-                                Block.Transaction t = new Block.Transaction();
+                                Transaction t = new Transaction();
                                 if(TransactionCount > 1) 
                                 {
                                     Console.WriteLine("TransactionCount > 1");
                                 }
 
                                 blockNumber = blockIndexInDataFile + blockNumberOffset;
-                                Block.Transaction transaction = t.readTransactionBytes(StateWallets.Wallets, reader2, blockNumber);
+                                Transaction transaction = t.readTransactionBytes(StateWallets.Wallets, reader2, blockNumber);
                                 
-                                newBlock.Transactions.Add(transaction);
-
+                                newCurrentBlock.Transactions.Add(transaction);
                             }
                         }
-                        if(limit<10)
+                        // CALC MERK ROOT
+
+                        //string block1 = "010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e362990101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0104ffffffff0100f2052a0100000043410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac00000000";
+                        //string block1Trans = block1.Substring(80);
+                        //transationsListAsBytes.Add(Helpers.HexToBytes(block1Trans));
+                        // Convert the hex string to bytes
+
+                        //byte[] transBytes = newCurrentBlock.Transactions[0].SerializeTransaction(); delete todo to do
+                        //string transHex = Helpers.ByteArrayToHexString(transBytes);
+                        //int lengthTrans = transHex.Length; ;
+                        //byte[] transactionBytes = Block.HexToBytes(transHex);
+
+                        var transactions = new List<byte[]>();
+                        foreach(var t in newCurrentBlock.Transactions)
+                        {
+                            transactions.Add(t.SerializeTransaction());
+                        }
+
+                        // Calculate the Merkle root
+                        byte[] merkleRoot = Block.CalculateMerkleRoot(transactions);
+
+                        //block 0 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
+                        //Block 1 0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098
+                        Console.WriteLine("Calculated Merkle Root: " + Helpers.GetStringReverseHexBytes(merkleRoot));
+
+                        string expectedMerkleRootOfBothTrans = "7dac2c5666815c17a3b36427de37bb9d2e2c5ccec3f8633eb91a4205cb4c10ff";
+                        if (Helpers.GetStringReverseHexBytes(merkleRoot).ToLower() ==  expectedMerkleRootOfBothTrans)
+                        {
+                            Console.WriteLine("sdf");
+                        }
+
+                        if (Helpers.GetStringReverseHexBytes(merkleRoot).ToLower() != newCurrentBlock.header.GetMerkleRootAsString().ToLower())
+                        {
+                            byte[] trans2Bytes = newCurrentBlock.Transactions[1].SerializeTransaction();
+                            string trans2Hex = Helpers.ByteArrayToHexString(trans2Bytes);
+                            throw new Exception("merkle root in header issue");
+                        }
+
+                        // End CALC MERK ROOT
+
+                        if (limit<10)
                         {
                             Console.WriteLine("sg");
                         }
                         blockIndexInDataFile++;
-                        blocksInDataFile.Add(newBlock);
+                        blocksInDataFile.Add(newCurrentBlock);
                         if(blocksInDataFile.Count != blockIndexInDataFile)
                         {
                             throw new Exception("bad: f(blocksInDataFile.Count != blockNumberInDataFile)");
@@ -185,16 +231,29 @@ namespace SatoshiSharpLib
 
                         // Expected Genesis Block hash: 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
 
+                        Console.WriteLine("    hash " + Helpers.GetStringReverseHexBytes((newCurrentBlock.header.PrevBlockHash)));
+                        Console.WriteLine("prevhash " + prevHash);
+                        if (blockNumber > 190)
+                        {
+                            Console.WriteLine("block 191 https://www.blockchain.com/explorer/blocks/btc/00000000520bf3614f3f3f312491bcce9ae820cfcf8393cf1e7aecb0db4932ab");
+                        }
+
                         if (prevHash != "")
                         {
-                            bool prevHashExpected = newBlock.header.PrevBlockHash.Length == Helpers.HexToBytes(Helpers.ReverseHexString(prevHash)).Length &&
-                                newBlock.header.PrevBlockHash.Zip(Helpers.HexToBytes(Helpers.ReverseHexString(prevHash)), (a, b) => a == b).All(x => x);
+                            bool prevHashExpected = newCurrentBlock.header.PrevBlockHash.Length == Helpers.HexToBytes(Helpers.ReverseHexString(prevHash)).Length &&
+                                newCurrentBlock.header.PrevBlockHash.Zip(Helpers.HexToBytes(Helpers.ReverseHexString(prevHash)), (a, b) => a == b).All(x => x);
                             if (!prevHashExpected)
                             {
+                                Console.WriteLine("    hash " + Helpers.GetStringReverseHexBytes((newCurrentBlock.header.PrevBlockHash)));
+                                Console.WriteLine("prevhash " + prevHash);
                                 throw new Exception("error prev hash");
                             }
                         }
-                        prevHash = Block.Header.CalculateBlockHash(newBlock.header);
+                        //Console.WriteLine("merkle 16293da6d4078f636b691448b57f96d5af32d7ca3fb15a20cc74845b224a44bd");
+                        newCurrentBlock.header.ConsoleWrite();
+                        prevHash = Block.Header.CalculateBlockHash(newCurrentBlock.header);
+                        Console.WriteLine("hash: " + prevHash.Substring(prevHash.Length - 6));
+                        Console.WriteLine("hash: " + prevHash.Substring(prevHash.Length - 6));
 
                         // test claude
                         //Transactions have merkle roots
@@ -204,11 +263,11 @@ namespace SatoshiSharpLib
                         // end test claude
                     }
 
-                    if (blockNumber > 94)
+                    if (blockNumber > 1170)
                     {
-                        Console.WriteLine("block 95 and larger");
+                        Console.WriteLine("block 170 and larger");
                     }
-                    if((int)BlockSize > 230) // first block is big due to message
+                    if((int)BlockSize > 11230) // first block is big due to message
                     {
                         Console.WriteLine("expect block 0 or 170 or 180 blockumber " + blockNumber);
                     }

@@ -91,7 +91,7 @@ namespace SatoshiSharpLib
             var spends = new List<Spend>();
             spends.Add(this);
 
-            SourceWallet.addTransaction(new Transaction { BlockNumber =0, Spends = spends});
+            SourceWallet.addTransaction(new TransactionDELETEME { BlockNumber =0, Spends = spends});
             //todo DestinationWallet.addTransaction(new Transaction { BlockNumber = 0,  = spends });
 
             AmountSats = sats;
@@ -99,11 +99,15 @@ namespace SatoshiSharpLib
     }
 
 
-    public class Transaction
+    public class TransactionDELETEME // trevor to do two transaction classes
     {
         //public required string TransactionHash { get; set; }
-        public required UInt64 BlockNumber { get; set; }
-        public required List<Spend> Spends { get; set; }
+        public required UInt64 BlockNumber { 
+            get; 
+            set; }
+        public required List<Spend> Spends { 
+            get;
+            set; }
     }
 
     public class StateWallets
@@ -145,15 +149,15 @@ namespace SatoshiSharpLib
         public Wallet(WalletAddress wa)
         {
             Address = wa;
-            Transactions = new List<Transaction>();
+            Transactions = new List<TransactionDELETEME>();
         }
 
-        public void addTransaction(Transaction transaction)
+        public void addTransaction(TransactionDELETEME transaction)
         {
 
         }
 
-        public void addTransactions(List<Transaction> transactions)
+        public void addTransactions(List<TransactionDELETEME> transactions)
         {
 
         }
@@ -163,7 +167,7 @@ namespace SatoshiSharpLib
 
         public WalletAddress Address { get; set; }
 
-        public List<Transaction> Transactions { get; set; }
+        public List<TransactionDELETEME> Transactions { get; set; }
 
         public UInt64 TotalSpentSats { get; set; }
         public UInt64 CurrentSpendableSats { get; set; }

@@ -4,14 +4,13 @@ using System.Security.Cryptography;
 using System.Text;
 using Org.BouncyCastle.Crypto.Digests;
 using Org.BouncyCastle.Utilities.Encoders;
+using System.Text.Json;
 
 using SatoshiSharpLib;
 using static SatoshiSharpLib.Helpers;
 
 namespace main
 {
-
-
     public class SatoshiSharp
     {
         public static byte[] OP_HASH160(byte[] input)
@@ -32,11 +31,96 @@ namespace main
         {
             byte[] bytes = Encoding.UTF8.GetBytes(input);
             return OP_HASH160(bytes);
-
         }
+
+        static void SaveDataWithOutKeyMaxBytes(byte[] key, string inputPath, int maxBytes)
+        {
+            if (!File.Exists(inputPath))
+            {
+                Console.WriteLine("File not found.");
+                return;
+            }
+
+            try
+            {
+                using (FileStream fs = new FileStream(inputPath, FileMode.Open, FileAccess.Read))
+                {
+                    // Read only the first 10,000 bytes (or less if file is smaller)
+                   
+                    byte[] buffer = new byte[Math.Min(maxBytes, (int)fs.Length)];
+                    fs.Read(buffer, 0, buffer.Length);
+
+                    // XOR encryption
+                    for (int i = 0; i < buffer.Length; i++)
+                    {
+                        buffer[i] ^= key[i % key.Length];
+                    }
+
+                    // Save with "_xored" before extension
+                    string dir = Path.GetDirectoryName(inputPath);
+                    string name = Path.GetFileNameWithoutExtension(inputPath);
+                    string ext = Path.GetExtension(inputPath);
+                    string outputPath = Path.Combine(dir, $"{name}_xored{ext}");
+
+                    File.WriteAllBytes(outputPath, buffer);
+
+                    Console.WriteLine($"Processed first {buffer.Length} bytes and saved as: {outputPath}");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex.Message}");
+            }
+        }
+        public class Settings
+        {
+            // Changed to instance properties for JSON deserialization
+            public string Version { get; set; } = string.Empty;
+            public string BlockChainDataDirectory { get; set; } = string.Empty;
+            public LoggingSettings Logging { get; set; } = new();
+        }
+
+        public class LoggingSettings
+        {
+            public string FilePath { get; set; } = string.Empty;
+        }
+
+        public static class SettingsReader
+        {
+
+            public static Settings ReadSettings(string filePath = "settings.txt")
+            {
+                try
+                {
+                    if (!File.Exists(filePath))
+                        throw new FileNotFoundException($"Settings file not found: {filePath}");
+
+                    string jsonContent = File.ReadAllText(filePath);
+
+                    var options = new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true,
+                        AllowTrailingCommas = true,
+                        ReadCommentHandling = JsonCommentHandling.Skip
+                    };
+
+                    var settings = JsonSerializer.Deserialize<Settings>(jsonContent, options)
+                        ?? throw new InvalidDataException("Failed to deserialize settings");
+
+                    return settings;
+                }
+                catch (Exception ex)
+                {
+                    throw new InvalidOperationException($"Error reading settings from {filePath}: {ex.Message}", ex);
+                }
+            }
+        }
+
         static void Main(string[] args)
         {
-            Console.WriteLine("Go!");
+            Console.WriteLine("Read Settings");
+            var settings = SettingsReader.ReadSettings(Path.Combine(Helpers.GetParentDirectory(".", 5), "settings.json"));
+            Console.WriteLine($"Block Chain data: {settings.BlockChainDataDirectory}" );
 
             Wallet wallet = new Wallet( new WalletAddress(0,0,0,0));// { AddressBase58 = "", AddressHex = "", Transactions = new List<WalletTransaction>()};
             
@@ -196,9 +280,36 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
 
             BlockReader bdf = new BlockReader();
 
-            byte[] key = new byte[] { 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 };
+            //byte[] data = new byte[8] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
+            //File.WriteAllBytes(Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "xorZero.dat"), data);
 
-            string path = Path.Combine(Helpers.GetParentDirectory(".", 5), "btcblockdata", "blk00000.dat");
+            byte[] key = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0}; //{142, 205, 168, 81, 211, 222, 85, 154 };
+
+            if (key[0] != 0 || key[1] != 0 ||
+                key[2] != 0 || key[3] != 0 ||
+                key[4] != 0 || key[5] != 0 ||
+                key[6] != 0 || key[7] != 0)
+            {
+                throw new Exception("use all zero! for xor data!");
+            }
+
+            //{ 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 }; // different for everyone
+            // to do read file in btcblockdata
+            string xorPath = Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "xor.dat");
+            byte[] xorData = File.ReadAllBytes(xorPath);
+            if(key[0] != xorData[0] ||                key[1] != xorData[1] ||
+                key[2] != xorData[2] ||                key[3] != xorData[3] ||
+                key[4] != xorData[4] ||                key[5] != xorData[5] ||
+                key[6] != xorData[6] ||                key[7] != xorData[7])
+            {
+                SaveDataWithOutKeyMaxBytes(key,                     Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00000.dat"),                    500000);
+                SaveDataWithOutKeyMaxBytes(key, Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00001.dat"),                    500000);
+                SaveDataWithOutKeyMaxBytes(key, Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00002.dat"),                    500000);
+                throw new Exception("bad xor data");
+            }
+
+
+            string path = Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00000.dat");
             
             StateWallets.Wallets =
             [
@@ -206,7 +317,7 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
             ];
 
             int blockNumberOffset = 0;
-            bdf.ReadBlkDataFile(path, key, blockNumberOffset, limit:180);
+            bdf.ReadBlkDataFile(path, key, blockNumberOffset, limit:1289);
 
             Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[0].header.PrevBlockHash)));
             Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[1].header.PrevBlockHash)));
