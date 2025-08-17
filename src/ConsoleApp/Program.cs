@@ -316,8 +316,14 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
                 new Wallet(new WalletAddress(0, 0, 0, 0)), // add the reward wallet
             ];
 
-            int blockNumberOffset = 0;
-            bdf.ReadBlkDataFile(path, key, blockNumberOffset, limit:1289);
+
+            Block lastBlock = null;
+            if (bdf.blocksInDataFile.Count != 0)
+            {
+                lastBlock = bdf.blocksInDataFile.Last();
+
+            }
+            bdf.ReadBlkDataFile(path, key, lastBlock, limit:1289);
 
             Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[0].header.PrevBlockHash)));
             Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[1].header.PrevBlockHash)));

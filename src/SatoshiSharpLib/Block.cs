@@ -5,19 +5,61 @@ using System.Security.Cryptography;
 
 namespace SatoshiSharpLib
 {
+
     public class Block
     {
-        int blockNumber = -1;
+        public int BlockNumber = -1;
 
-        public Header header { get; set; } = new Header();
+        public Header header { get; 
+            set; } = new Header();
 
-        public List<Transaction> Transactions { get; set; } = new List<Transaction>();
+        public List<Transaction> Transactions { get; 
+            set; } = new List<Transaction>();
+
+        public Block PreviousBlock { get; 
+            set; }
+
+
+        public class ThirtyTwoByteClass
+        {
+            public readonly byte[] ThirtyTwoBytes;
+
+            public readonly int Length = 32;
+
+            public ThirtyTwoByteClass(byte[] value)
+            {
+                if (value?.Length != 32)
+                {
+                    throw new ArgumentException("MerkleRoot must be exactly 32 bytes");
+                }    
+                ThirtyTwoBytes = value ?? throw new ArgumentNullException(nameof(value));
+            }
+
+            public byte[] Value => ThirtyTwoBytes;
+
+
+            public int GetLength()
+            {
+                return 32;
+            }
+
+            public override string ToString()
+            {
+
+                return Helpers.GetStringReverseHexBytes(ThirtyTwoBytes); // Using your extension method
+            }
+
+            // Implicit conversion operators for convenience
+            public static implicit operator byte[](ThirtyTwoByteClass merkleRoot) => merkleRoot.ThirtyTwoBytes;
+            public static implicit operator ThirtyTwoByteClass(byte[] bytes) => new ThirtyTwoByteClass(bytes);
+        }
 
         public class Header
         {
             public uint Version { get; set; }
-            public byte[] PrevBlockHash { get; set; }   // 32 bytes
-            public byte[] MerkleRoot { get; set; }  // 32 bytes
+            public ThirtyTwoByteClass PrevBlockHash { get; set; }
+            //public byte[] MerkleRoot { get; set; }  // 32 bytes
+            public ThirtyTwoByteClass MerkleRoot { get; set; }
             public uint Timestamp { get; set; }
             public uint Bits { get; set; }
             public uint Nonce { get; set; }

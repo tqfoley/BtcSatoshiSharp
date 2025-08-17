@@ -7,6 +7,7 @@ using Org.BouncyCastle.Utilities.Encoders;
 
 namespace SatoshiSharpLib
 {
+
     public class Helpers // the majority of this class generated with ChatGPT
     {
 

@@ -1,0 +1,7 @@
+{
+  "BlockChainDataDirectory": "btcblockdata",
+  "version": "1.0.0",
+  "logging": {
+    "filePath": "logs/app.log"
+  }
+}

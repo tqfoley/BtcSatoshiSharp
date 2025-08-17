@@ -38,9 +38,47 @@ namespace SatoshiSharpLib
             last = (UInt64)l;
         }
 
+        // not tested to do todo written by claude check later
         public void SetWalletAddress(string hex)
         {
+            // Remove "0x" prefix if present
+            if (hex.StartsWith("0x") || hex.StartsWith("0X"))
+            {
+                hex = hex.Substring(2);
+            }
 
+            // Pad with leading zeros if necessary to make it 64 characters (256 bits)
+            hex = hex.PadLeft(64, '0');
+
+            // Validate hex string length
+            if (hex.Length != 64)
+            {
+                throw new ArgumentException("Hex string must represent exactly 256 bits (64 hex characters after padding)");
+            }
+
+            // Validate that all characters are valid hex
+            if (!System.Text.RegularExpressions.Regex.IsMatch(hex, "^[0-9A-Fa-f]+$"))
+            {
+                throw new ArgumentException("Invalid hex string - contains non-hexadecimal characters");
+            }
+
+            try
+            {
+                // Split into 4 parts of 16 characters each (64 bits each)
+                // Each UInt64 can hold 64 bits (16 hex characters)
+                first = Convert.ToUInt64(hex.Substring(0, 16), 16);
+                second = Convert.ToUInt64(hex.Substring(16, 16), 16);
+                third = Convert.ToUInt64(hex.Substring(32, 16), 16);
+                last = Convert.ToUInt64(hex.Substring(48, 16), 16);
+            }
+            catch (OverflowException)
+            {
+                throw new ArgumentException("Hex string contains values too large for UInt64");
+            }
+            catch (FormatException)
+            {
+                throw new ArgumentException("Invalid hex string format");
+            }
         }
 
         public WalletAddress(string hexOrBase58)
@@ -97,7 +135,6 @@ namespace SatoshiSharpLib
             AmountSats = sats;
         }
     }
-
 
     public class TransactionDELETEME // trevor to do two transaction classes
     {

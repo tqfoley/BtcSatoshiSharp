@@ -2,6 +2,7 @@ using Org.BouncyCastle.Crypto.Digests;
 using Org.BouncyCastle.Utilities.Encoders;
 using SatoshiSharpLib;
 using System.Security.Cryptography;
+using System.Transactions;
 
 namespace SatoshiSharpTest;
 
@@ -18,7 +19,7 @@ public class SatoshiSharpTest
     public void Block0()
     {
         BlockReader bdf = new BlockReader();
-        byte[] key = new byte[] { 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 };
+        byte[] key = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 };//{ 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 };
         
         StateWallets.Wallets =
         [
@@ -26,15 +27,16 @@ public class SatoshiSharpTest
         ];
         string path = Path.Combine(Helpers.GetParentDirectory(".", 5), "btcblockdata", "blk00000.dat");
         //string path = "..\\..\\..\\..\\..\\btcblockdata\\blk00000.dat";
-        bdf.ReadBlkDataFile(path, key, limit: 100);
-        Assert.Equal("0000000000000000000000000000000000000000000000000000000000000000", Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[0].header.PrevBlock)));
+        bdf.ReadBlkDataFile(path, key, null, limit: 3);
+        Assert.Equal("0000000000000000000000000000000000000000000000000000000000000000", Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[0].header.PrevBlockHash)));
     }
 
     [Fact]
     public void BlockHeader1()
     {
         BlockReader bdf = new BlockReader();
-        byte[] key = new byte[] { 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 };
+        byte[] key = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 };
+        //{ 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 };
         
         StateWallets.Wallets =
         [
@@ -44,8 +46,8 @@ public class SatoshiSharpTest
         string path = Path.Combine(Helpers.GetParentDirectory(".", 5), "btcblockdata", "blk00000.dat");
             
         //string path = "..\\..\\..\\..\\..\\btcblockdata\\blk00000.dat";
-        bdf.ReadBlkDataFile(path, key, limit: 100);
-        Assert.Equal("00000000839A8E6886AB5951D76F411475428AFC90947EE320161BBF18EB6048", Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[2].header.PrevBlock)));
+        bdf.ReadBlkDataFile(path, key, null, limit: 5);
+        Assert.Equal("00000000839A8E6886AB5951D76F411475428AFC90947EE320161BBF18EB6048", Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[2].header.PrevBlockHash)));
     }
 
     [Fact]
@@ -80,4 +82,5 @@ public class SatoshiSharpTest
         string final = Helpers.Base58Encode(Helpers.HexToBytes(fullAddressInHex));
         Assert.Equal("12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX", final);
     }
+
 }

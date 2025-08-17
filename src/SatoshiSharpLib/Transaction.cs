@@ -173,8 +173,6 @@ vMerkleTree: 4a5e1e
         }
 
 
-
-
         public Transaction readTransactionBytes(List<Wallet> wallets, BinaryReader reader, int blockNumber, bool printDebug = false)
         {
             //using (MemoryStream ms = new MemoryStream(txBytes))
