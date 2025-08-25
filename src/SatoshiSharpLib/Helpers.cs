@@ -129,6 +129,25 @@ namespace SatoshiSharpLib
 
         }
 
+        public static bool IsEqualHexStrings(string a, string b)
+        {
+            if (a.ToLower() == b.ToLower())
+            {
+                return true;
+            }
+
+            if (a.ToLower().Contains(b.ToLower()))
+            {
+                throw new Exception("hex compare contains");
+            }
+            if (b.ToLower().Contains(a.ToLower()))
+            {
+                throw new Exception("hex compare contains");
+            }
+
+            return false;
+
+        }
         public static string GetStringReverseHexBytes(byte[] hexBytes)
         {
             string hex = Helpers.ByteArrayToHexString(hexBytes);
@@ -148,7 +167,7 @@ namespace SatoshiSharpLib
             Array.Reverse(bytePairs);
 
             // Join into final hex string
-            return string.Join("", bytePairs);
+            return string.Join("", bytePairs).ToLower();
         }
 
         public static string ReverseHexString(string hex)
@@ -180,7 +199,6 @@ namespace SatoshiSharpLib
             return BitConverter.ToString(bytes).Replace("-", "");
         }
 
-        // Helper: Hex to byte[]
         public static byte[] HexToBytes(string hex)
         {
             return Enumerable.Range(0, hex.Length / 2)
@@ -271,29 +289,6 @@ namespace SatoshiSharpLib
             }
             if (bytes.Length % 16 != 0)
                 Console.WriteLine();
-        }
-
-        public static void PrintHexData(BinaryReader br, int maxBytes)
-        {
-            byte[] a = br.ReadBytes(maxBytes); // 0x10
-
-            for (int i = 0; i < maxBytes; i++)
-            {
-                Console.Write($"{a[i]:X2} ");
-
-                // Add a newline every 16 bytes for readability
-                if ((i + 1) % 32 == 0)
-                {
-                    Console.WriteLine();
-                }
-            }
-
-            if (maxBytes % 32 != 0)
-            {
-                Console.WriteLine(); // Final newline if needed
-            }
-
-            br.BaseStream.Seek(-1 * maxBytes, SeekOrigin.Current);
         }
 
         public static void PrintHexData(byte[] data, int maxBytes)
@@ -534,9 +529,6 @@ namespace SatoshiSharpLib
             }
         }
 
-        /// <summary>
-        /// Helper class for building Merkle trees with detailed information
-        /// </summary>
         public class MerkleTree
         {
             public class MerkleNode
@@ -623,21 +615,6 @@ namespace SatoshiSharpLib
             }*/
         }
 
-        /*
-        private static byte[] HexStringToByteArray(string hex)
-        {
-            if (hex.Length % 2 != 0)
-                throw new ArgumentException("Hex string must have even length");
-
-            byte[] bytes = new byte[hex.Length / 2];
-            for (int i = 0; i < hex.Length; i += 2)
-            {
-                bytes[i / 2] = Convert.ToByte(hex.Substring(i, 2), 16);
-            }
-            return bytes;
-        }*/
-
-
         public static void WriteUInt32LE(byte[] buffer, int offset, uint value)
         {
             buffer[offset] = (byte)(value & 0xFF);
@@ -645,7 +622,5 @@ namespace SatoshiSharpLib
             buffer[offset + 2] = (byte)((value >> 16) & 0xFF);
             buffer[offset + 3] = (byte)((value >> 24) & 0xFF);
         }
-
     }
-
 }

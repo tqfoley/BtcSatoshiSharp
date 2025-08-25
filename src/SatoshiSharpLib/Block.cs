@@ -8,16 +8,12 @@ namespace SatoshiSharpLib
 
     public class Block
     {
-        public int BlockNumber = -1;
 
         public Header header { get; 
             set; } = new Header();
 
         public List<Transaction> Transactions { get; 
             set; } = new List<Transaction>();
-
-        public Block PreviousBlock { get; 
-            set; }
 
 
         public class ThirtyTwoByteClass
@@ -45,11 +41,10 @@ namespace SatoshiSharpLib
 
             public override string ToString()
             {
-
-                return Helpers.GetStringReverseHexBytes(ThirtyTwoBytes); // Using your extension method
+                string ret = Helpers.GetStringReverseHexBytes(ThirtyTwoBytes);
+                return ret.ToLower();
             }
 
-            // Implicit conversion operators for convenience
             public static implicit operator byte[](ThirtyTwoByteClass merkleRoot) => merkleRoot.ThirtyTwoBytes;
             public static implicit operator ThirtyTwoByteClass(byte[] bytes) => new ThirtyTwoByteClass(bytes);
         }
@@ -64,7 +59,11 @@ namespace SatoshiSharpLib
             public uint Bits { get; set; }
             public uint Nonce { get; set; }
             public ulong TransactionCount { get; set; }
+            public int BlockNumber = -1;
+            public bool Valid = false;
 
+            public Block PrevBlock = null; // maybe should not be in header
+            public string Hash = "";
 
             public static string CalculateBlockHash(Block.Header blockHeader)
             {
@@ -94,7 +93,7 @@ namespace SatoshiSharpLib
                 Helpers.WriteUInt32LE(bytes, offset, (uint)header.Version);
                 offset += 4;
 
-                // Previous block hash (32 bytes, little-endian)
+                // Prev block hash (32 bytes, little-endian)
                 byte[] prevHashBytes = Helpers.HexToBytes(header.GetPrevBlockHashAsString()); // toDo trevor to do don't convert to string and back
                 Array.Reverse(prevHashBytes); // Convert to little-endian
                 Array.Copy(prevHashBytes, 0, bytes, offset, 32);
@@ -122,42 +121,30 @@ namespace SatoshiSharpLib
                 return bytes;
             }
 
-            public string ReverseRemoveDashAndToLower(byte[] a)
-            {
-                string b = BitConverter.ToString(a).Replace("-", "");
-                string c = Helpers.ReverseHexString(b).ToLower();
-                return c;
-            }
 
             public void ConsoleWrite()
             {
-                Console.WriteLine("Version: " + Version);
-                Console.WriteLine("PrevBlockHash: " + Helpers.GetStringReverseHexBytes(PrevBlockHash));
-                Console.WriteLine("------------------------------------------------------");
-                Console.WriteLine("MerkleRoot: " + Helpers.GetStringReverseHexBytes(MerkleRoot));
-                Console.WriteLine("Timestamp: " + Timestamp);
-                Console.WriteLine("Bits: " + Bits);
-                Console.WriteLine("Nonce: " + Nonce);
-                Console.WriteLine("TransactionCount: " + TransactionCount);
+                Console.WriteLine(this.ToString());
             }
 
             public override string ToString()
             {
                 string prevBlockWithZerosAtEnd = BitConverter.ToString(PrevBlockHash).Replace("-", "");
                 string prevBlockMatchExplorers = Helpers.ReverseHexString(prevBlockWithZerosAtEnd).ToLower();
-                string hexBits = Bits.ToString("X8");
+                string hexBits = Bits.ToString("X8").ToLower();
 
 
-
-                return $"Version: {Version}\n" +
-                       //$"Previous Block: {BitConverter.ToString(PrevBlock).Replace("-", "")}\n" +
-                       $"Previous Block: {prevBlockMatchExplorers}\n" +
-                       $"---------------------------------------------------\n" +
-                       $"Merkle Root: {ReverseRemoveDashAndToLower(MerkleRoot)}\n" +
-                       $"Timestamp: {Timestamp} ({UnixTimeStampToDateTime(Timestamp)})\n" +
+                return $"==================================\n" +
+                       $"Prev Block:           {prevBlockMatchExplorers}\n" +
+                       $"==================================\n" +
+                       $"Block Number: {BlockNumber}\n" +
+                       $"Version: {Version}\n" +
+                       $"Timestamp: {Timestamp} ({UnixTimeStampToDateTime(Timestamp)}) subtract 5 hours \n" +
+                       $"Merkle Root: {Helpers.GetStringReverseHexBytes(MerkleRoot)}\n" +
                        $"Bits: {hexBits}\n" +
                        $"Nonce: {Nonce}\n" +
-                       $"TransactionCount: {TransactionCount}";
+                       $"TransactionCount: {TransactionCount}\n" +
+                       $"Hash:                     {Block.Header.CalculateBlockHash(this)}\n";
             }
 
             private static DateTime UnixTimeStampToDateTime(uint unixTime)
@@ -186,7 +173,7 @@ namespace SatoshiSharpLib
                         Console.WriteLine("das");
                     }
 
-                    Console.WriteLine(header);
+                    //Console.WriteLine(header);
                     return header;
                 }
             }
@@ -297,7 +284,6 @@ namespace SatoshiSharpLib
             }
             return bytes;
         }
-
 
     }
 }

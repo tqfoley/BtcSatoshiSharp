@@ -1,5 +1,5 @@
 {
-  "BlockChainDataDirectory": "btcblockdata",
+  "BlockChainDataDirectory": "C:\\btcblock\\smallamountofblocks_zeroxor",
   "version": "1.0.0",
   "logging": {
     "filePath": "logs/app.log"

@@ -26,7 +26,7 @@ namespace SatoshiSharpLib
 
         public List<Block> blocksInDataFile = new List<Block>();
 
-        public int ReadBlkDataFile(string FilePathSpecificToMyKey, byte[] key, Block previousBlock, int? limit=null)
+        public int ReadBlkDataFile(string FilePath, byte[] key, Block prevBlock, int? limit=null)
         {
             if (key.Length != 8)
             {
@@ -34,11 +34,12 @@ namespace SatoshiSharpLib
             }
 
             int totalBytes = 0;
+            int currentTotalBytesDebug = 0;
 
             byte[] dataSpecificToMyKey = null;
             try
             {
-                dataSpecificToMyKey = File.ReadAllBytes(FilePathSpecificToMyKey);
+                dataSpecificToMyKey = File.ReadAllBytes(FilePath);
                 Console.WriteLine($"Read {dataSpecificToMyKey.Length} bytes from file.");
                 totalBytes = dataSpecificToMyKey.Length;
 
@@ -67,14 +68,17 @@ namespace SatoshiSharpLib
             {
                 limit = int.MaxValue;
             }
+            int lastFilePosition = 0;
+            int countNumberTimesLoopingBelowDEBUG = 0;
 
+            int totalNumberBlocksReadIncludingInvalid = 0;
             using (MemoryStream ms = new MemoryStream(data))
             using (BinaryReader reader = new BinaryReader(ms))
             {
-
                 // read entire block data file about 100 megabytes
                 while (ms.Position < ms.Length && limit-- > 0)
                 {
+                    countNumberTimesLoopingBelowDEBUG++;
                     MagicBytes = reader.ReadBytes(4);
 
                     byte[] expectedMagic = new byte[] { 0xF9, 0xBE, 0xB4, 0xD9 };
@@ -90,10 +94,11 @@ namespace SatoshiSharpLib
                     //Helpers.PrintHexData(reader, 4);
                     BlockSize = reader.ReadUInt32();
                     currentBytesRead += (int)BlockSize + 4 + 4; // 4 bytes for magic number and 4 bytes for block size 
+                    currentTotalBytesDebug += currentBytesRead;
 
                     if (BlockSize != 215 && BlockSize != 216)
                     {
-                        Console.WriteLine("not 215 bytes");
+                        Console.WriteLine("not 215 bytes instead " + BlockSize);
                     }
                     //Helpers.PrintHexData(reader, (int)BlockSize + 8);
 
@@ -102,27 +107,28 @@ namespace SatoshiSharpLib
                         throw new InvalidDataException("block size bigger than 266222.");
                     }
 
+                    Console.WriteLine("lastFilePosition " + lastFilePosition);
+                    lastFilePosition += currentBytesRead;
                     using (MemoryStream ms2 = new MemoryStream(reader.ReadBytes((int)BlockSize)))
                     using (BinaryReader reader2 = new BinaryReader(ms2))
                     {
+                        totalNumberBlocksReadIncludingInvalid++;
 
                         List<byte[]> transationsListAsBytes = new List<byte[]>();
 
-                        //Helpers.PrintHexData(reader2, (int)BlockSize);
-                        //loop here to do todo trevor
                         Block newCurrentBlock = new Block();
                         {
                             newCurrentBlock.header = Block.Header.Parse(reader2.ReadBytes(80));
                             
                             newCurrentBlock.header.TransactionCount = Helpers.ReadVarInt(reader2);
 
-                            if (previousBlock == null)
+                            if (prevBlock == null)
                             {
-                                newCurrentBlock.BlockNumber = 0;
+                                newCurrentBlock.header.BlockNumber = 0;
                             }
                             else
                             {
-                                newCurrentBlock.BlockNumber = previousBlock.BlockNumber + 1;
+                                newCurrentBlock.header.BlockNumber = prevBlock.header.BlockNumber + 1;
                             }
 
                             if (newCurrentBlock.header.TransactionCount > 870)
@@ -130,6 +136,25 @@ namespace SatoshiSharpLib
                                 throw new InvalidDataException("TransactionCount bigger than 870.");
                             }
 
+                            newCurrentBlock.header.Hash = Block.Header.CalculateBlockHash(newCurrentBlock.header);
+                            if (prevBlock != null)
+                            {
+                                if (Block.Header.CalculateBlockHash(prevBlock.header) != prevBlock.header.Hash)
+                                {
+                                    Console.WriteLine("hash prev bad mismatch invalid");
+                                    //throw new Exception("bad");
+                                }
+                                //if (Block.Header.CalculateBlockHash(newCurrentBlock.header.PrevBlock.header) != newCurrentBlock.header.PrevBlock.header.Hash)
+                                {
+                                    //throw new Exception("bad");
+                                }
+                                if (newCurrentBlock.header.PrevBlockHash.ToString() == prevBlock.header.Hash)
+                                {
+                                    newCurrentBlock.header.PrevBlock = prevBlock; // assume its valid but if not set prev block back to null
+                                }
+                            }
+
+                            // read transactions
                             for (ulong i = 0; i < newCurrentBlock.header.TransactionCount; i++)
                             {
 
@@ -138,16 +163,20 @@ namespace SatoshiSharpLib
                                 {
                                     Console.WriteLine("TransactionCount > 1");
                                 }
+                                if (newCurrentBlock.header.TransactionCount > 2)
+                                {
+                                    Console.WriteLine("TransactionCount > 2");
+                                }
 
-                                
-                                Transaction transaction = t.readTransactionBytes(StateWallets.Wallets, reader2, newCurrentBlock.BlockNumber);
-                                
+                                Transaction transaction = t.readTransactionBytes(StateWallets.Wallets, reader2, newCurrentBlock.header.BlockNumber);
+
                                 newCurrentBlock.Transactions.Add(transaction);
                             }
 
+
                         }
 
-                        int blockNumberFORDEBUGGING = newCurrentBlock.BlockNumber;
+                        int blockNumberFORDEBUGGING = newCurrentBlock.header.BlockNumber;
                         // CALC MERK ROOT
 
                         //string block1 = "010000006fe28c0ab6f1b372c1a6a246ae63f74f931e8365e15a089c68d6190000000000982051fd1e4ba744bbbe680e1fee14677ba1a3c3540bf7b1cdb606e857233e0e61bc6649ffff001d01e362990101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0104ffffffff0100f2052a0100000043410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac00000000";
@@ -171,13 +200,21 @@ namespace SatoshiSharpLib
 
                         //block 0 4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b
                         //Block 1 0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098
-                        Console.WriteLine("Calculated Merkle Root: " + Helpers.GetStringReverseHexBytes(merkleRoot));
+                        //Console.WriteLine("Calculated Merkle Root: " + Helpers.GetStringReverseHexBytes(merkleRoot));
 
 
                         string expectedMerkleRootOfBothTrans = "7dac2c5666815c17a3b36427de37bb9d2e2c5ccec3f8633eb91a4205cb4c10ff";
                         if (Helpers.GetStringReverseHexBytes(merkleRoot).ToLower() ==  expectedMerkleRootOfBothTrans)
                         {
                             Console.WriteLine("sdf");
+                        }
+
+                        string expectedMerkle193 =
+                        "10470e2c3c443863ea2e84684f7f6021539f518d3246ad97125d348ea1a75964";
+                        if (Helpers.GetStringReverseHexBytes(merkleRoot).ToLower() == expectedMerkle193)
+                        {
+                            Console.WriteLine("expectedMerkle193");
+                            Console.WriteLine("totalNumberBlocksReadIncludingInvalid " + totalNumberBlocksReadIncludingInvalid);
                         }
 
                         if (Helpers.GetStringReverseHexBytes(merkleRoot).ToLower() != newCurrentBlock.header.GetMerkleRootAsString().ToLower())
@@ -204,7 +241,7 @@ namespace SatoshiSharpLib
                             Bits = newBlock.header.Bits,
                             MerkleRoot = newBlock.header.GetMerkleRootAsString(),
                             Nonce = newBlock.header.Nonce,
-                            PreviousBlockHash = newBlock.header.GetPrevBlockHashAsString(),
+                            PrevBlockHash = newBlock.header.GetPrevBlockHashAsString(),
                             Timestamp = newBlock.header.Timestamp,
                             Version = (int)newBlock.header.Version
                         };*/
@@ -212,7 +249,7 @@ namespace SatoshiSharpLib
                         /*var genesisBlock = new BitcoinBlockHeader
                         {
                             Version = 1,
-                            PreviousBlockHash = "0000000000000000000000000000000000000000000000000000000000000000",
+                            PrevBlockHash = "0000000000000000000000000000000000000000000000000000000000000000",
                             MerkleRoot =        "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b",
                             Timestamp = 1231006505, // 2009-01-03 18:15:05 UTC
                             Bits = 0x1d00ffff,
@@ -226,47 +263,75 @@ namespace SatoshiSharpLib
 
                         // Expected Genesis Block hash: 000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f
 
-                        Console.WriteLine("    hash " + Helpers.GetStringReverseHexBytes((newCurrentBlock.header.PrevBlockHash)));
+                        //Console.WriteLine("    hash " + Helpers.GetStringReverseHexBytes((newCurrentBlock.header.PrevBlockHash)));
                         //Console.WriteLine("prevhash " + prevHash);
 
+                        newCurrentBlock.header.ConsoleWrite();
                         // 193 merkle root 10470e2c3c443863ea2e84684f7f6021539f518d3246ad97125d348ea1a75964
-
+                        //192 16293da6d4078f636b691448b57f96d5af32d7ca3fb15a20cc74845b224a44bd
                         string test = newCurrentBlock.header.MerkleRoot.ToString();
-                        if (newCurrentBlock.BlockNumber > 3190)
+                        if (newCurrentBlock.header.BlockNumber > 191)
                         {
-                            Console.WriteLine("block 3191 https://www.blockchain.com/explorer/blocks/btc/00000000520bf3614f3f3f312491bcce9ae820cfcf8393cf1e7aecb0db4932ab");
+                            //Console.WriteLine("block 192 https://www.blockchain.com/explorer/blocks/btc/00000000520bf3614f3f3f312491bcce9ae820cfcf8393cf1e7aecb0db4932ab");
+
+                            List<string> toFile = new List<string>();
+                            int c = 0;
+                            Block curr = newCurrentBlock;
+                            while(curr != null)
+                            {
+                                toFile.Add(c++.ToString("0000.0") + "  " + Block.Header.CalculateBlockHash(curr.header));
+
+                                toFile.Add("t       " + (DateTimeOffset.FromUnixTimeSeconds(curr.header.Timestamp).UtcDateTime));
+
+                                toFile.Add("p       " + curr.header.PrevBlockHash);
+
+                                curr = curr.header.PrevBlock;
+
+                            }
+                            File.WriteAllLines("C:\\btcblock\\mostblocks11_zeroxor\\hashes.txt", toFile);
                         }
 
-                        //if (prevHash != "")
+                        if (prevBlock != null)
                         {
-                            //bool prevHashExpected = newCurrentBlock.header.PrevBlockHash.Length == Helpers.HexToBytes(Helpers.ReverseHexString(prevHash)).Length &&
-                            //    newCurrentBlock.header.PrevBlockHash.ThirtyTwoBytes.Zip(Helpers.HexToBytes(Helpers.ReverseHexString(prevHash)), (a, b) => a == b).All(x => x);
-                            //if (!prevHashExpected)
+                            if (Block.Header.CalculateBlockHash(prevBlock.header) != newCurrentBlock.header.PrevBlockHash.ToString())
                             {
-                            //    Console.WriteLine("    hash " + Helpers.GetStringReverseHexBytes((newCurrentBlock.header.PrevBlockHash)));
-                            //    Console.WriteLine("prevhash " + prevHash);
-                            //    throw new Exception("error prev hash");
+
+                                Console.WriteLine("    hash " + newCurrentBlock.header.PrevBlockHash.ToString());// Helpers.GetStringReverseHexBytes((newCurrentBlock.header.PrevBlockHash)));
+                                Console.WriteLine("prevhash " + Block.Header.CalculateBlockHash(prevBlock.header));
+                                throw new Exception("error prev hash");
+                                
+                                // some block invalid
+                                newCurrentBlock.header.Valid = false;
+                                Console.WriteLine("totalNumberBlocksReadIncludingInvalid " + totalNumberBlocksReadIncludingInvalid);
+                            }
+                            else
+                            {
+                                newCurrentBlock.header.Valid = true;
+                                prevBlock = newCurrentBlock;
+                                Console.WriteLine("totalNumberBlocksReadIncludingInvalid " + totalNumberBlocksReadIncludingInvalid);
                             }
                         }
-                        //Console.WriteLine("merkle 16293da6d4078f636b691448b57f96d5af32d7ca3fb15a20cc74845b224a44bd");
-                        newCurrentBlock.header.ConsoleWrite();
-                        //prevHash = Block.Header.CalculateBlockHash(newCurrentBlock.header);
-                        //Console.WriteLine("hash: " + prevHash.Substring(prevHash.Length - 6));
-                        //Console.WriteLine("hash: " + prevHash.Substring(prevHash.Length - 6));
+                        else
+                        {
+                            // make the first block work
+                            newCurrentBlock.header.Valid = true;
+                            prevBlock = newCurrentBlock;
+                        }
 
-                        previousBlock = newCurrentBlock;
+                        //Console.WriteLine("hash: " + prevHash.Substring(prevHash.Length - 6));
                     }// end reading block, Last thing increement block index
 
-                    if((int)BlockSize > 11230)
+                    if ((int)BlockSize > 1000)
                     {
-                        //Console.WriteLine("expect block 0 or 170 or 180 blockumber " + blockNumber);
+                        Console.WriteLine("large block size!");
+                        Console.WriteLine("totalNumberBlocksReadIncludingInvalid " + totalNumberBlocksReadIncludingInvalid);
                     }
                     //Console.WriteLine(blockNumber + " totalBytes: " + totalBytes + "block size (-8 to match) : " + ((int)BlockSize) + " now " + currentBytesRead + " diff " + (totalBytes - currentBytesRead).ToString());
 
                     if (ms.Position == ms.Length)
                     {
                         exactBytesAccountedForNoExtra = true;
-                        Console.WriteLine("Finished reading block!");
+                        Console.WriteLine("Finished reading block!"); // this is for the entire ~100 meg file
                     }
 
 
@@ -275,6 +340,11 @@ namespace SatoshiSharpLib
 
             }// end reafing block data file
 
+            if (!exactBytesAccountedForNoExtra && limit == null)
+            {
+                Console.WriteLine("unexpected block file size");
+                throw new Exception("unexpected block file size");
+            }
             if (limit > 0)
             {
                 if (!exactBytesAccountedForNoExtra)

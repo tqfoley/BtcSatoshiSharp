@@ -46,7 +46,7 @@ namespace main
                 using (FileStream fs = new FileStream(inputPath, FileMode.Open, FileAccess.Read))
                 {
                     // Read only the first 10,000 bytes (or less if file is smaller)
-                   
+
                     byte[] buffer = new byte[Math.Min(maxBytes, (int)fs.Length)];
                     fs.Read(buffer, 0, buffer.Length);
 
@@ -116,16 +116,83 @@ namespace main
             }
         }
 
+
         static void Main(string[] args)
         {
             Console.WriteLine("Read Settings");
-            var settings = SettingsReader.ReadSettings(Path.Combine(Helpers.GetParentDirectory(".", 5), "settings.json"));
-            Console.WriteLine($"Block Chain data: {settings.BlockChainDataDirectory}" );
+            var settings = SettingsReader.ReadSettings(Path.Combine(Helpers.GetParentDirectory(".", 4), "settings.json"));
+            Console.WriteLine($"Block Chain data: {settings.BlockChainDataDirectory}");
 
-            Wallet wallet = new Wallet( new WalletAddress(0,0,0,0));// { AddressBase58 = "", AddressHex = "", Transactions = new List<WalletTransaction>()};
-            
 
-              string scriptHex = "410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac";
+            List<string> findStrings = new List<string>{
+                "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f", // block 0 hash, found at 305 (285 for first block)
+                "00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048", // block 1 hash, found at 528 makes sense (305+8+215)
+
+                "000000008b3ff2aaf3427f2a624cb9978e687d9fbba5000dc2f52bb4cc82d4be",
+
+                "00000000b2cde2159116889837ecf300bd77d229d49b138c55366b54626e495d",//187
+
+                "000000009a940db389f3a7cbb8405f4ec14342bed36073b60ee63ed7e117f193", // 188
+
+                "000000008bb30dccc10c56c339c8aaacbe0c71051dc51ee10cc84db945db2978", // 189 43803
+              
+                "000000007d31c3592c3fd6f4571c14870f06150028320dda7c847e1869881535", //190 44027
+              
+                "00000000520bf3614f3f3f312491bcce9ae820cfcf8393cf1e7aecb0db4932ab", // 191 44250
+              
+                "000000000a35a6104f17dc5dedb6ef250ef412f4fbf67f5dd77f964aa1c10b36", // 192 50742   makes sense (215 + 40?) * 192
+              
+                "00000000833cccbec543914a96b4994669205444c85d9e4f5268d808910b9696", // 193 51189
+
+                //prev hash
+                "000000003c29d5cb24584ddb079dd51cf9ecd02a96de0aecf05f8c2bcfa709f2", // expected 193 here prevoous hash INVALID
+
+                "10470e2c3c443863ea2e84684f7f6021539f518d3246ad97125d348ea1a75964" // MERKLE ROOT 193 found at 50774 so block 193 should exist  
+              
+               //"000000000000000000000000000000000000000000000000"
+             };
+
+            long prev = 0;
+
+            foreach (var fs in findStrings)
+            {
+                break;
+                string data0 = Helpers.ReverseHexString(fs);
+                //18eb6048";
+                //string data1 = "f769a41a1cb063";
+                //string data2 = Helpers.ReverseHexString(data1);
+
+                string data5 = "4e4f4e4f4e4fcccccccccccccccccccccccccccccccc888888888888888888888888888";
+                byte[] j = Helpers.HexToBytes(data5);
+                long indexTotal = 0;
+
+                //mostblocks11_zeroxor\\blk00000_ordered.dat";
+                string file = "blk00000_ordered.dat";
+                //indexTotal += FindBytePattern("C:\\btcblock\\" + file , Helpers.HexToBytes(data));
+                indexTotal += ClaudeCode.FindBytePattern("C:\\btcblock\\mostblocks11_zeroxor\\" + file, Helpers.HexToBytes(data0));
+                //indexTotal += FindBytePattern("C:\\btcblock\\" + file, Helpers.HexToBytes(data1));
+                //indexTotal += FindBytePattern("C:\\btcblock\\" + file, Helpers.HexToBytes(data2));
+                //indexTotal += FindBytePattern("C:\\btcblock\\" + file, Helpers.HexToBytes(data5));
+
+
+                // Check if multiple matches exist
+                bool hasMultiple = ClaudeCode.HasMultipleMatches("C:\\btcblock\\mostblocks11_zeroxor\\" + file, Helpers.HexToBytes(data0));
+                if (hasMultiple)
+                    throw new Exception("sfsf bad");
+                // Get all match positions (unlimited)
+                var allMatches = ClaudeCode.FindAllMatches("C:\\btcblock\\mostblocks11_zeroxor\\" + file, Helpers.HexToBytes(data0));
+
+                Console.WriteLine(indexTotal + " diff " + (indexTotal - prev) + " avg " + ((43358 - 290) / 186));
+                prev = indexTotal;
+            }
+
+
+
+
+            Wallet wallet = new Wallet(new WalletAddress(0, 0, 0, 0));// { AddressBase58 = "", AddressHex = "", Transactions = new List<WalletTransaction>()};
+
+
+            string scriptHex = "410496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858eeac";
             //second bitcoin transaction     41   0496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858ee  ac   reward 50 BTC
             //410496B538E853519C726A2C91E61EC11600AE1390813A627C66FB8BE7947BE63C52DA7589379515D4E0A604F8141781E62294721166BF621E73A82CBF2342C858EEAC}
             //ScriptPubKey: 410496B538E853519C726A2C91E61EC11600AE1390813A627C66FB8BE7947BE63C52DA7589379515D4E0A604F8141781E62294721166BF621E73A82CBF2342C858EEAC}
@@ -187,7 +254,7 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
                 string pubKeyHex = //"0496b538e853519c726a2c91e61ec11600ae1390813a627c66fb8be7947be63c52da7589379515d4e0a604f8141781e62294721166bf621e73a82cbf2342c858ee";
                                    "0496B538E853519C726A2C91E61EC11600AE1390813A627C66FB8BE7947BE63C52DA7589379515D4E0A604F8141781E62294721166BF621E73A82CBF2342C858EE";
                 //pubKeyHex = firstzero.ToLower();
-                string third =     "047211A824F55B505228E4C3D5194C1FCFAA15A456ABDF37F9B9D97A4040AFC073DEE6C89064984F03385237D92167C13E236446B417AB79A0FCAE412AE3316B77";
+                string third = "047211A824F55B505228E4C3D5194C1FCFAA15A456ABDF37F9B9D97A4040AFC073DEE6C89064984F03385237D92167C13E236446B417AB79A0FCAE412AE3316B77";
                 //pubKeyHex = third;
                 byte[] pubKeyBytes = Hex.Decode(pubKeyHex);
 
@@ -213,7 +280,7 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
                 byte[] checksum = sha256.ComputeHash(sha256.ComputeHash(versionedPayload));  // expected checksum 90AFE11C
 
                 // Step 5: Base58Check encode
-                Console.WriteLine(Helpers.ByteArrayToHexString(checksum).Substring(0,8));
+                Console.WriteLine(Helpers.ByteArrayToHexString(checksum).Substring(0, 8));
 
                 string importantPartOfChecksum = Helpers.ByteArrayToHexString(checksum).Substring(0, 8);
 
@@ -234,10 +301,10 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
                 string fullAddressInHex = "00" + mainPartOfAddress + importantPartOfChecksum;
                 Console.WriteLine(fullAddressInHex);
 
-                string j = Helpers.Base58Encode(Helpers.HexToBytes(fullAddressInHex));
+                string j2 = Helpers.Base58Encode(Helpers.HexToBytes(fullAddressInHex));
                 //                                                  00119B098E2E980A229E139A9ED01A469E518E6F26 90AFE11C  this is correct
                 // not sure what this is                            00119B098E2E980A229E139A9ED01A469E518E6F268D97C3A4 WRONG
-                Console.WriteLine(j);
+                Console.WriteLine(j2);
 
 
 
@@ -283,7 +350,7 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
             //byte[] data = new byte[8] { 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 };
             //File.WriteAllBytes(Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "xorZero.dat"), data);
 
-            byte[] key = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0}; //{142, 205, 168, 81, 211, 222, 85, 154 };
+            byte[] key = new byte[] { 0, 0, 0, 0, 0, 0, 0, 0 }; //{142, 205, 168, 81, 211, 222, 85, 154 };
 
             if (key[0] != 0 || key[1] != 0 ||
                 key[2] != 0 || key[3] != 0 ||
@@ -295,22 +362,39 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
 
             //{ 0x22, 0x6B, 0x64, 0x3B, 0x1C, 0xE5, 0x63, 0x68 }; // different for everyone
             // to do read file in btcblockdata
-            string xorPath = Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "xor.dat");
-            byte[] xorData = File.ReadAllBytes(xorPath);
-            if(key[0] != xorData[0] ||                key[1] != xorData[1] ||
-                key[2] != xorData[2] ||                key[3] != xorData[3] ||
-                key[4] != xorData[4] ||                key[5] != xorData[5] ||
-                key[6] != xorData[6] ||                key[7] != xorData[7])
+            string xorPath = "";
+            if (settings.BlockChainDataDirectory.Contains(":\\"))
             {
-                SaveDataWithOutKeyMaxBytes(key,                     Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00000.dat"),                    500000);
-                SaveDataWithOutKeyMaxBytes(key, Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00001.dat"),                    500000);
-                SaveDataWithOutKeyMaxBytes(key, Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00002.dat"),                    500000);
+                xorPath = Path.Combine(settings.BlockChainDataDirectory, "xor.dat");
+            }
+            else
+            {
+                xorPath = Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "xor.dat");
+            }
+
+            byte[] xorData = File.ReadAllBytes(xorPath);
+            if (key[0] != xorData[0] || key[1] != xorData[1] ||
+                key[2] != xorData[2] || key[3] != xorData[3] ||
+                key[4] != xorData[4] || key[5] != xorData[5] ||
+                key[6] != xorData[6] || key[7] != xorData[7])
+            {
+                SaveDataWithOutKeyMaxBytes(key, Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00000.dat"), 500000);
+                SaveDataWithOutKeyMaxBytes(key, Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00001.dat"), 500000);
+                SaveDataWithOutKeyMaxBytes(key, Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00002.dat"), 500000);
                 throw new Exception("bad xor data");
             }
 
 
-            string path = Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00000.dat");
-            
+            string path = "";
+            if (settings.BlockChainDataDirectory.Contains(":\\"))
+            {
+                path = Path.Combine(settings.BlockChainDataDirectory, "blk00000_ordered.dat");
+            }
+            else
+            {
+                path = Path.Combine(Helpers.GetParentDirectory(".", 5), settings.BlockChainDataDirectory, "blk00000_ordered.dat");
+            }
+
             StateWallets.Wallets =
             [
                 new Wallet(new WalletAddress(0, 0, 0, 0)), // add the reward wallet
@@ -323,7 +407,7 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
                 lastBlock = bdf.blocksInDataFile.Last();
 
             }
-            bdf.ReadBlkDataFile(path, key, lastBlock, limit:1289);
+            bdf.ReadBlkDataFile(path, key, lastBlock, limit: 119009);
 
             Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[0].header.PrevBlockHash)));
             Console.WriteLine(Helpers.ReverseHexString(Helpers.ByteArrayToHexString(bdf.blocksInDataFile[1].header.PrevBlockHash)));
@@ -337,7 +421,7 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
 
             var v = Helpers.BitcoinBase58AddressToHexString("12c6DSiU4Rq3P4ZxziKxzrL5LmMBrzjrJX");
 
-            var b  = Helpers.BitcoinBase58AddressToHexString("1EHp4zm1T2yUyjEmW3H4qauTJiVEXan3Uf");
+            var b = Helpers.BitcoinBase58AddressToHexString("1EHp4zm1T2yUyjEmW3H4qauTJiVEXan3Uf");
 
             Console.WriteLine(v);
 
@@ -361,7 +445,7 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
 
             //var block = Header.Parse(byteArray);
             //Console.WriteLine(block);
-            
+
 
 
 
@@ -372,6 +456,390 @@ D304D9060026D2C5AED09B330B85A8FF10926AC432C7A7AEE384E47B2FA1A670
 
             Console.WriteLine("End\n");
         }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    public class ClaudeCode
+    {
+
+        /// <summary>
+        /// Finds the first occurrence of a byte pattern in a binary file
+        /// </summary>
+        /// <param name="filePath">Path to the binary file to search</param>
+        /// <param name="pattern">Byte array pattern to find</param>
+        /// <param name="bufferSize">Buffer size for reading chunks (default 1MB)</param>
+        /// <returns>Index of the first occurrence, or -1 if not found</returns>
+        public static long FindBytePattern(string filePath, byte[] pattern, int bufferSize = 1024 * 1024)
+        {
+            if (pattern == null || pattern.Length == 0)
+                throw new ArgumentException("Pattern cannot be null or empty");
+
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"File not found: {filePath}");
+
+            using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                return FindBytePattern(fileStream, pattern, bufferSize);
+            }
+        }
+
+        /// <summary>
+        /// Finds the first occurrence of a byte pattern in a stream
+        /// </summary>
+        /// <param name="stream">Stream to search in</param>
+        /// <param name="pattern">Byte array pattern to find</param>
+        /// <param name="bufferSize">Buffer size for reading chunks</param>
+        /// <returns>Index of the first occurrence, or -1 if not found</returns>
+        public static long FindBytePattern(Stream stream, byte[] pattern, int bufferSize = 1024 * 1024)
+        {
+            if (pattern == null || pattern.Length == 0)
+                throw new ArgumentException("Pattern cannot be null or empty");
+
+            if (stream == null || !stream.CanRead)
+                throw new ArgumentException("Stream must be readable");
+
+            // Ensure buffer is at least twice the pattern size to handle patterns spanning chunks
+            bufferSize = Math.Max(bufferSize, pattern.Length * 2);
+
+            byte[] buffer = new byte[bufferSize];
+            long totalBytesRead = 0;
+            int overlap = pattern.Length - 1;
+
+            stream.Position = 0;
+
+            while (true)
+            {
+                // Read chunk from file
+                int bytesRead = stream.Read(buffer, overlap, bufferSize - overlap);
+
+                if (bytesRead == 0)
+                    break; // End of file reached
+
+                int searchLength = bytesRead + overlap;
+
+                // Search for pattern in current chunk
+                for (int i = 0; i <= searchLength - pattern.Length; i++)
+                {
+                    bool found = true;
+                    for (int j = 0; j < pattern.Length; j++)
+                    {
+                        if (buffer[i + j] != pattern[j])
+                        {
+                            found = false;
+                            break;
+                        }
+                    }
+
+                    if (found)
+                    {
+                        return totalBytesRead + i - overlap;
+                    }
+                }
+
+                // Copy the last (pattern.Length - 1) bytes to beginning of buffer
+                // for next iteration to handle patterns spanning chunks
+                if (bytesRead == bufferSize - overlap)
+                {
+                    Array.Copy(buffer, bufferSize - overlap, buffer, 0, overlap);
+                }
+
+                totalBytesRead += bytesRead;
+            }
+
+            return -1; // Pattern not found
+        }
+
+        /// <summary>
+        /// More efficient version using Boyer-Moore algorithm for large patterns
+        /// </summary>
+        /// <param name="filePath">Path to the binary file to search</param>
+        /// <param name="pattern">Byte array pattern to find</param>
+        /// <param name="bufferSize">Buffer size for reading chunks</param>
+        /// <returns>Index of the first occurrence, or -1 if not found</returns>
+        public static long FindBytePatternBoyerMoore(string filePath, byte[] pattern, int bufferSize = 1024 * 1024)
+        {
+            if (pattern == null || pattern.Length == 0)
+                throw new ArgumentException("Pattern cannot be null or empty");
+
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"File not found: {filePath}");
+
+            using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                return FindBytePatternBoyerMoore(fileStream, pattern, bufferSize);
+            }
+        }
+
+        public static long FindBytePatternBoyerMoore(Stream stream, byte[] pattern, int bufferSize = 1024 * 1024)
+        {
+            if (pattern == null || pattern.Length == 0)
+                throw new ArgumentException("Pattern cannot be null or empty");
+
+            // Build bad character table for Boyer-Moore
+            int[] badCharTable = BuildBadCharTable(pattern);
+
+            bufferSize = Math.Max(bufferSize, pattern.Length * 2);
+            byte[] buffer = new byte[bufferSize];
+            long totalBytesRead = 0;
+            int overlap = pattern.Length - 1;
+
+            stream.Position = 0;
+
+            while (true)
+            {
+                int bytesRead = stream.Read(buffer, overlap, bufferSize - overlap);
+
+                if (bytesRead == 0)
+                    break;
+
+                int searchLength = bytesRead + overlap;
+
+                // Boyer-Moore search
+                int i = 0;
+                while (i <= searchLength - pattern.Length)
+                {
+                    int j = pattern.Length - 1;
+
+                    while (j >= 0 && pattern[j] == buffer[i + j])
+                        j--;
+
+                    if (j < 0)
+                    {
+                        return totalBytesRead + i - overlap;
+                    }
+
+                    i += Math.Max(1, j - badCharTable[buffer[i + j]]);
+                }
+
+                if (bytesRead == bufferSize - overlap)
+                {
+                    Array.Copy(buffer, bufferSize - overlap, buffer, 0, overlap);
+                }
+
+                totalBytesRead += bytesRead;
+            }
+
+            return -1;
+        }
+
+        private static int[] BuildBadCharTable(byte[] pattern)
+        {
+            int[] table = new int[256];
+
+            // Initialize all positions to -1
+            for (int i = 0; i < 256; i++)
+                table[i] = -1;
+
+            // Fill the table with last occurrence of each character
+            for (int i = 0; i < pattern.Length; i++)
+                table[pattern[i]] = i;
+
+            return table;
+        }
+
+
+        /// <summary>
+        /// Checks if there are multiple occurrences of a byte pattern in a binary file
+        /// </summary>
+        /// <param name="filePath">Path to the binary file to search</param>
+        /// <param name="pattern">Byte array pattern to find</param>
+        /// <param name="bufferSize">Buffer size for reading chunks (default 1MB)</param>
+        /// <returns>True if multiple matches found, false if 0 or 1 match</returns>
+        public static bool HasMultipleMatches(string filePath, byte[] pattern, int bufferSize = 1024 * 1024)
+        {
+            if (pattern == null || pattern.Length == 0)
+                throw new ArgumentException("Pattern cannot be null or empty");
+
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"File not found: {filePath}");
+
+            using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                return HasMultipleMatches(fileStream, pattern, bufferSize);
+            }
+        }
+
+        /// <summary>
+        /// Checks if there are multiple occurrences of a byte pattern in a stream
+        /// </summary>
+        /// <param name="stream">Stream to search in</param>
+        /// <param name="pattern">Byte array pattern to find</param>
+        /// <param name="bufferSize">Buffer size for reading chunks</param>
+        /// <returns>True if multiple matches found, false if 0 or 1 match</returns>
+        public static bool HasMultipleMatches(Stream stream, byte[] pattern, int bufferSize = 1024 * 1024)
+        {
+            if (pattern == null || pattern.Length == 0)
+                throw new ArgumentException("Pattern cannot be null or empty");
+
+            if (stream == null || !stream.CanRead)
+                throw new ArgumentException("Stream must be readable");
+
+            bufferSize = Math.Max(bufferSize, pattern.Length * 2);
+
+            byte[] buffer = new byte[bufferSize];
+            long totalBytesRead = 0;
+            int overlap = pattern.Length - 1;
+            int matchCount = 0;
+
+            stream.Position = 0;
+
+            while (true)
+            {
+                int bytesRead = stream.Read(buffer, overlap, bufferSize - overlap);
+
+                if (bytesRead == 0)
+                    break;
+
+                int searchLength = bytesRead + overlap;
+
+                // Search for pattern in current chunk
+                for (int i = 0; i <= searchLength - pattern.Length; i++)
+                {
+                    bool found = true;
+                    for (int j = 0; j < pattern.Length; j++)
+                    {
+                        if (buffer[i + j] != pattern[j])
+                        {
+                            found = false;
+                            break;
+                        }
+                    }
+
+                    if (found)
+                    {
+                        matchCount++;
+                        if (matchCount >= 2)
+                            return true; // Early exit once we find 2+ matches
+
+                        // Skip ahead by pattern length to avoid overlapping matches
+                        i += pattern.Length - 1;
+                    }
+                }
+
+                if (bytesRead == bufferSize - overlap)
+                {
+                    Array.Copy(buffer, bufferSize - overlap, buffer, 0, overlap);
+                }
+
+                totalBytesRead += bytesRead;
+            }
+
+            return false; // Found 0 or 1 match
+        }
+
+        /// <summary>
+        /// Finds all occurrences of a byte pattern in a binary file
+        /// </summary>
+        /// <param name="filePath">Path to the binary file to search</param>
+        /// <param name="pattern">Byte array pattern to find</param>
+        /// <param name="maxResults">Maximum number of results to return (0 = unlimited)</param>
+        /// <param name="bufferSize">Buffer size for reading chunks (default 1MB)</param>
+        /// <returns>List of indices where pattern was found</returns>
+        public static List<long> FindAllMatches(string filePath, byte[] pattern, int maxResults = 0, int bufferSize = 1024 * 1024)
+        {
+            if (pattern == null || pattern.Length == 0)
+                throw new ArgumentException("Pattern cannot be null or empty");
+
+            if (!File.Exists(filePath))
+                throw new FileNotFoundException($"File not found: {filePath}");
+
+            using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            {
+                return FindAllMatches(fileStream, pattern, maxResults, bufferSize);
+            }
+        }
+
+        /// <summary>
+        /// Finds all occurrences of a byte pattern in a stream
+        /// </summary>
+        /// <param name="stream">Stream to search in</param>
+        /// <param name="pattern">Byte array pattern to find</param>
+        /// <param name="maxResults">Maximum number of results to return (0 = unlimited)</param>
+        /// <param name="bufferSize">Buffer size for reading chunks</param>
+        /// <returns>List of indices where pattern was found</returns>
+        public static List<long> FindAllMatches(Stream stream, byte[] pattern, int maxResults = 0, int bufferSize = 1024 * 1024)
+        {
+            if (pattern == null || pattern.Length == 0)
+                throw new ArgumentException("Pattern cannot be null or empty");
+
+            if (stream == null || !stream.CanRead)
+                throw new ArgumentException("Stream must be readable");
+
+            var matches = new List<long>();
+            bufferSize = Math.Max(bufferSize, pattern.Length * 2);
+
+            byte[] buffer = new byte[bufferSize];
+            long totalBytesRead = 0;
+            int overlap = pattern.Length - 1;
+
+            stream.Position = 0;
+
+            while (true)
+            {
+                int bytesRead = stream.Read(buffer, overlap, bufferSize - overlap);
+
+                if (bytesRead == 0)
+                    break;
+
+                int searchLength = bytesRead + overlap;
+
+                // Search for pattern in current chunk
+                for (int i = 0; i <= searchLength - pattern.Length; i++)
+                {
+                    bool found = true;
+                    for (int j = 0; j < pattern.Length; j++)
+                    {
+                        if (buffer[i + j] != pattern[j])
+                        {
+                            found = false;
+                            break;
+                        }
+                    }
+
+                    if (found)
+                    {
+                        matches.Add(totalBytesRead + i - overlap);
+
+                        if (maxResults > 0 && matches.Count >= maxResults)
+                            return matches;
+
+                        // Skip ahead by pattern length to avoid overlapping matches
+                        i += pattern.Length - 1;
+                    }
+                }
+
+                if (bytesRead == bufferSize - overlap)
+                {
+                    Array.Copy(buffer, bufferSize - overlap, buffer, 0, overlap);
+                }
+
+                totalBytesRead += bytesRead;
+            }
+
+            return matches;
+        }
+
     }
 }
 
