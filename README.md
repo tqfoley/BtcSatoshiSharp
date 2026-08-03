@@ -403,3 +403,67 @@ For more information, visit: https://www.gnu.org/licenses/gpl-3.0.en.html
 ---
 
 **Disclaimer**: This software is provided for educational and research purposes. Use at your own risk. The authors are not responsible for any loss of funds or data.
+
+
+##tqfoley
+tqfoley todo look at claude output below:
+
+Created CLAUDE.md. There was no existing one, and no Cursor or Copilot rules to fold in.
+
+I verified everything empirically rather than trusting the README — which turned out to matter, since the README documents an API that doesn't exist:
+
+What I confirmed by running things:
+- dotnet build succeeds (31 nullability warnings, pre-existing)
+- dotnet test → 2 passed, 2 failed. The two block-reading tests fail because btcblockdata/ is gitignored and absent; BlockReader.cs:55 catches the FileNotFoundException and rethrows it as Exception("bad"), which hides the cause
+- The console app can't run at all: its settings path arithmetic resolves to src/settings.json, but the file lives at the repo root. Via dotnet run it's worse — the parent walk goes past C:\ and NREs
+
+Architecture points worth knowing up front: parsing is one big method with validation inline (throwing, not flagging); blocks must be pre-sorted into chain order, hence the _ordered.dat filenames; and endianness conversion is pervasive, with ThirtyTwoByteClass.ToString() silently reversing to explorer order.
+
+Landmines I called out: a hard-coded C:\btcblock\...\hashes.txt write at block >191, sanity limits (BlockSize > 266222, TransactionCount > 870) that will reject modern blocks, and readSignedSpend assuming bare P2PK with a hard-coded value of 50 — which is the real reason only genesis-era blocks parse.
+
+Two things I documented but deliberately didn't fix, since they're beyond an /init: the console app's settings path bug, and the README/code divergence. Both are worth a follow-up if you want them addressed.
+
+
+
+prompt:
+ I want to write isolated code in public class MainBlockDownload to download the bitcoin blocks into blk00000.dat files, I know this can include chain split data dn the blocks are not nessecaryily ordered so just download all the blocks in the fastest way possible,  I will trim the forked blocks and order the data later.  I also don't want to use the XOR option, which is like using a xor value of all zeros
+
+
+
+
+
+
+
+ What was added
+
+src/ConsoleApp/MainBlockDownload.cs — a self-contained Bitcoin P2P downloader. It has no dependency on SatoshiSharpLib; everything (wire protocol, varint, double-SHA256, hex) is local to the class. The stub Main in Program.cs:12 was replaced by a comment pointing at the new file.
+
+Record layout written to disk is exactly Core's, with no XOR:
+[F9 BE B4 D9][block size, uint32 LE][block bytes]
+Rollover at 128 MiB into blk00001.dat, etc. An all-zero xor.dat is dropped alongside so the existing check in Program.cs:393 passes.
+
+How it gets speed
+
+getheaders syncs the whole header chain first (480k headers in ~33s in testing), which yields every block hash in height order. Then N peer connections each keep 16 getdata requests in flight and pump blocks into a bounded queue that one writer thread drains sequentially to disk. Blocks land in arrival order, not height order — that's the point, and it's what makes the parallelism free. A blocks.index sidecar (48 bytes/block: hash, fileNo, offset, size) is written as it goes, so your later ordering/trimming pass can seek directly instead of rescanning.
+
+Peers come from DNS seeds plus getaddr; version sets relay=false so you never receive loose transactions. Stalled peers are dropped on a 30s deadline and their in-flight hashes requeued.
+
+Verified
+
+- 300 early blocks: 301 records, file consumed byte-exact, block 0 at offset 0 with the correct genesis hash, all heights present.
+- Resume: re-running the same command read 301 blocks from the index, reused cached headers, fetched nothing.
+- Post-segwit (481900–481980, 69.2 MB): 81 blocks, all 81 coinbases carry the 00 01 witness marker; the 301 early blocks don't. Witness serialization is correct.
+- Combined store: 382 records, 382 index entries, zero missing, zero magic errors.
+
+dotnet run --project src/ConsoleApp -- --out C:\btcblock\raw
+dotnet run --project src/ConsoleApp -- --out C:\btcblock\raw --stop 200000 --peers 16
+dotnet run --project src/ConsoleApp -- --out C:\btcblock\raw --node 127.0.0.1:8333
+Ctrl+C is a clean stop; re-run to resume.
+
+Two things worth flagging
+
+Fork blocks won't come down this way. getheaders only ever walks a peer's active chain, so you can only fetch hashes you already know. You'll get the main chain plus whatever stale blocks are announced while running near the tip — historical orphans aren't discoverable over P2P. I added --extra <file> (one display-order hash per line) so you can fetch them if you source the hashes elsewhere. Your trim-later plan still works; there's just less to trim than you may be expecting.
+
+Safety guard: the tool refuses to run against a directory that has blk*.dat files but no blocks.index, so pointing --out at a real Bitcoin Core datadir errors out instead of overwriting its xor.dat and blocks. The default --out comes from BlockChainDataDirectory in settings.json (resolved by walking up to find the file, rather than the fixed parent count Program.cs uses), which currently points at C:\btcblock\smallamountofblocks_zeroxor — so you'll want an explicit --out unless that one is empty.
+
+Note the output won't feed this repo's BlockReader directly: it requires chain order and throws above BlockSize > 266222 (BlockReader.cs:105). That's what your ordering pass is for.

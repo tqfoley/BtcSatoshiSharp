@@ -9,7 +9,15 @@ using System.Text.Json;
 using SatoshiSharpLib;
 using static SatoshiSharpLib.Helpers;
 
-namespace main
+// main.MainBlockDownload (the Main entry point) now lives in MainBlockDownload.cs
+
+
+
+
+
+
+
+namespace main2
 {
     public class SatoshiSharp
     {
@@ -117,7 +125,7 @@ namespace main
         }
 
 
-        static void Main(string[] args)
+        static void Main2(string[] args)
         {
             Console.WriteLine("Read Settings");
             var settings = SettingsReader.ReadSettings(Path.Combine(Helpers.GetParentDirectory(".", 4), "settings.json"));
