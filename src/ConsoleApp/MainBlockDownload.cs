@@ -6,7 +6,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace main
+namespace main3
 {
     /// <summary>
     /// Standalone Bitcoin P2P block downloader.
@@ -157,7 +157,7 @@ namespace main
         // Entry point
         // ------------------------------------------------------------------------------------
 
-        static async Task<int> Main(string[] args)
+        static async Task<int> Main3(string[] args)
         {
             var opt = new Options();
             try
@@ -305,7 +305,8 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                         if (!prop.NameEquals("BlockChainDataDirectory")) continue;
                         string value = prop.Value.GetString() ?? "";
                         if (value.Length == 0) break;
-                        return Path.IsPathRooted(value) ? value : Path.Combine(dir.FullName, value);
+                        if (Path.IsPathRooted(value)) return value;
+                        return Path.Combine(dir.FullName, value);
                     }
                 }
                 catch (Exception ex)
@@ -325,7 +326,9 @@ refuse to touch a directory holding blk*.dat files it did not create.");
         {
             Console.WriteLine("output directory : " + _opt.OutputDirectory);
             Console.WriteLine("peers            : " + _opt.PeerCount + " x " + _opt.InFlightPerPeer + " blocks in flight");
-            Console.WriteLine("witness data     : " + (_opt.RequestWitness ? "yes" : "no (stripped)"));
+            string witness = "no (stripped)";
+            if (_opt.RequestWitness) witness = "yes";
+            Console.WriteLine("witness data     : " + witness);
             Console.WriteLine("xor              : none (xor.dat written as eight zero bytes)");
 
             Directory.CreateDirectory(_opt.OutputDirectory);
@@ -648,7 +651,8 @@ refuse to touch a directory holding blk*.dat files it did not create.");
 
         byte[] BuildGetData(List<byte[]> hashes)
         {
-            uint type = _opt.RequestWitness ? MsgWitnessBlock : MsgBlock;
+            uint type = MsgBlock;
+            if (_opt.RequestWitness) type = MsgWitnessBlock;
             var ms = new MemoryStream();
             WriteVarInt(ms, (ulong)hashes.Count);
             foreach (var h in hashes)
@@ -701,9 +705,11 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                 lastBytes = bytes;
                 lastBlocks = blocks;
 
-                string eta = blocksPerSec > 0.01
-                    ? TimeSpan.FromSeconds(Interlocked.Read(ref _remaining) / blocksPerSec).ToString(@"hh\:mm\:ss")
-                    : "--:--:--";
+                string eta = "--:--:--";
+                if (blocksPerSec > 0.01)
+                {
+                    eta = TimeSpan.FromSeconds(Interlocked.Read(ref _remaining) / blocksPerSec).ToString(@"hh\:mm\:ss");
+                }
 
                 Console.WriteLine(blocks + " blocks  " + (bytes / 1024.0 / 1024.0 / 1024.0).ToString("F2") + " GB  "
                                   + mbPerSec.ToString("F1") + " MB/s  " + blocksPerSec.ToString("F0") + " blk/s  "
@@ -927,8 +933,12 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                 uint length = BinaryPrimitives.ReadUInt32LittleEndian(_headerBuf.AsSpan(16, 4));
                 if (length > MaxMessageBytes) throw new InvalidDataException(command + " message is " + length + " bytes");
 
-                byte[] payload = length == 0 ? Array.Empty<byte>() : new byte[length];
-                if (length > 0) await _stream.ReadExactlyAsync(payload, 0, (int)length, timeout.Token);
+                byte[] payload = Array.Empty<byte>();
+                if (length > 0)
+                {
+                    payload = new byte[length];
+                    await _stream.ReadExactlyAsync(payload, 0, (int)length, timeout.Token);
+                }
 
                 if (_opt.VerifyChecksums)
                 {
@@ -1128,7 +1138,8 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                     if (!fileLengths.TryGetValue(fileNo, out long len))
                     {
                         var fi = new FileInfo(FilePath(fileNo));
-                        len = fi.Exists ? fi.Length : 0;
+                        len = 0;
+                        if (fi.Exists) len = fi.Length;
                         fileLengths[fileNo] = len;
                     }
                     return len;
@@ -1242,8 +1253,11 @@ refuse to touch a directory holding blk*.dat files it did not create.");
         {
             public bool Equals(byte[]? x, byte[]? y) => Equal(x, y);
 
-            public int GetHashCode(byte[] obj) =>
-                obj.Length >= 4 ? BinaryPrimitives.ReadInt32LittleEndian(obj.AsSpan(0, 4)) : obj.Length;
+            public int GetHashCode(byte[] obj)
+            {
+                if (obj.Length >= 4) return BinaryPrimitives.ReadInt32LittleEndian(obj.AsSpan(0, 4));
+                return obj.Length;
+            }
 
             public static bool Equal(byte[]? a, byte[]? b)
             {

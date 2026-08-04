@@ -13,6 +13,30 @@ dotnet test --logger "console;verbosity=detailed"    # see the heavy Console.Wri
 
 There is no linter or formatter configured. `Nullable` and `ImplicitUsings` are enabled everywhere, so the build emits ~31 nullability warnings; they are pre-existing noise, not something a change introduced.
 
+## Code style
+
+**Never use the ternary conditional operator (`cond ? a : b`).** Always write it as a plain `if`/`else`, even when that costs extra lines or means declaring the variable on its own first:
+
+```csharp
+// NO - do not write this
+BlockLocation? found = req.ByHash
+    ? FindBlockByHash(req.Directory, req.FileIndex, req.Hash!, out scanned)
+    : FindBlockByPosition(req.Directory, req.FileIndex, req.BlockIndex, out scanned);
+
+// YES
+BlockLocation? found;
+if (req.ByHash)
+{
+    found = FindBlockByHash(req.Directory, req.FileIndex, req.Hash!, out scanned);
+}
+else
+{
+    found = FindBlockByPosition(req.Directory, req.FileIndex, req.BlockIndex, out scanned);
+}
+```
+
+This applies to every use, including short ones buried inside a `return`, a string concatenation, or an argument list — hoist those into an `if` above the statement.
+
 ## Running requires blockchain data that is not in the repo
 
 `btcblockdata/` is gitignored, and nothing in the build produces it. Consequences on a fresh clone:

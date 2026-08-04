@@ -405,7 +405,13 @@ For more information, visit: https://www.gnu.org/licenses/gpl-3.0.en.html
 **Disclaimer**: This software is provided for educational and research purposes. Use at your own risk. The authors are not responsible for any loss of funds or data.
 
 
-##tqfoley
+## tqfoley Notes
+https://api.blockchair.com/bitcoin/raw/block/3
+https://api.blockchair.com/bitcoin/raw/block/33
+
+
+## tqfoley todo
+
 tqfoley todo look at claude output below:
 
 Created CLAUDE.md. There was no existing one, and no Cursor or Copilot rules to fold in.
