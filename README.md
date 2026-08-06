@@ -410,6 +410,8 @@ https://api.blockchair.com/bitcoin/raw/block/3
 https://api.blockchair.com/bitcoin/raw/block/33
 
 
+
+
 ## tqfoley todo
 
 tqfoley todo look at claude output below:
@@ -473,3 +475,14 @@ Fork blocks won't come down this way. getheaders only ever walks a peer's active
 Safety guard: the tool refuses to run against a directory that has blk*.dat files but no blocks.index, so pointing --out at a real Bitcoin Core datadir errors out instead of overwriting its xor.dat and blocks. The default --out comes from BlockChainDataDirectory in settings.json (resolved by walking up to find the file, rather than the fixed parent count Program.cs uses), which currently points at C:\btcblock\smallamountofblocks_zeroxor — so you'll want an explicit --out unless that one is empty.
 
 Note the output won't feed this repo's BlockReader directly: it requires chain order and throws above BlockSize > 266222 (BlockReader.cs:105). That's what your ordering pass is for.
+
+
+
+
+
+Two unrelated things I noticed while testing, not touched:
+
+- HeaderChain never disposes its headers.dat FileStream — it stays locked for the life of the process. Harmless in a one-shot run, but it made my first harness pass fail when it tried to read the file after RunAsync returned.
+- The retry lane fired again on this download: retried 16 blocks off the retry lane, and the run finished with zero gaps.
+
+

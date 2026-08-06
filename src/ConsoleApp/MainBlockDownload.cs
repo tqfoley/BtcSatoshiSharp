@@ -82,6 +82,12 @@ namespace main3
 
             /// <summary>Per-message deadline. A peer that goes quiet is dropped and its blocks requeued.</summary>
             public TimeSpan ReadTimeout = TimeSpan.FromSeconds(30);
+
+            /// <summary>
+            /// How many peers may fail on the same block before it is given up on. Stops a block
+            /// no peer will serve from cycling the retry lane forever.
+            /// </summary>
+            public int MaxAttemptsPerBlock = 10;
         }
 
         // ------------------------------------------------------------------------------------
@@ -136,6 +142,21 @@ namespace main3
         readonly ulong _nonce;
 
         readonly ConcurrentQueue<byte[]> _work = new ConcurrentQueue<byte[]>();          // block hashes still to fetch
+
+        /// <summary>
+        /// Blocks handed back by a peer that died mid-batch. Workers drain this before _work, so a
+        /// dropped batch is retried within seconds. Appending them to _work instead would put them
+        /// behind every block not yet dispatched - a retry deferred until the end of the chain,
+        /// which never arrives if the run is stopped early, and that is how gaps got left behind.
+        /// </summary>
+        readonly ConcurrentQueue<byte[]> _retry = new ConcurrentQueue<byte[]>();
+
+        /// <summary>How many times each block has been handed back. Only failures land here.</summary>
+        readonly ConcurrentDictionary<byte[], int> _attempts =
+            new ConcurrentDictionary<byte[], int>(new ByteArrayComparer());
+
+        /// <summary>Blocks given up on after too many attempts, named in the closing summary.</summary>
+        readonly ConcurrentBag<byte[]> _abandoned = new ConcurrentBag<byte[]>();
         readonly ConcurrentQueue<IPEndPoint> _addrs = new ConcurrentQueue<IPEndPoint>(); // peers still to try
         readonly ConcurrentDictionary<string, byte> _knownAddrs = new ConcurrentDictionary<string, byte>();
         readonly BlockingCollection<KeyValuePair<byte[], byte[]>> _toWrite =
@@ -143,6 +164,7 @@ namespace main3
 
         BlockStore _store = null!;
         long _remaining;
+        long _retried;
         long _blocksWritten;
         long _bytesWritten;
         int _livePeers;
@@ -223,6 +245,7 @@ namespace main3
                     case "--start": opt.StartHeight = int.Parse(Next("--start")); break;
                     case "--stop": opt.StopHeight = int.Parse(Next("--stop")); break;
                     case "--max-file-mb": opt.MaxBlockFileBytes = long.Parse(Next("--max-file-mb")) * 1024 * 1024; break;
+                    case "--max-attempts": opt.MaxAttemptsPerBlock = int.Parse(Next("--max-attempts")); break;
                     case "--no-witness": opt.RequestWitness = false; break;
                     case "--no-checksum": opt.VerifyChecksums = false; break;
                     case "--node": opt.FixedNodes.Add(ParseEndPoint(Next("--node"))); break;
@@ -232,6 +255,7 @@ namespace main3
             }
 
             if (opt.PeerCount < 1) throw new ArgumentException("--peers must be >= 1");
+            if (opt.MaxAttemptsPerBlock < 1) throw new ArgumentException("--max-attempts must be >= 1");
             if (opt.InFlightPerPeer < 1) throw new ArgumentException("--inflight must be >= 1");
             if (opt.StopHeight < opt.StartHeight) throw new ArgumentException("--stop is below --start");
             return true;
@@ -249,6 +273,7 @@ Bitcoin block downloader - writes un-XORed blk*.dat files.
   --stop <height>      last height to download                (default chain tip)
   --node <host:port>   use this node instead of the DNS seeds (repeatable)
   --extra <file>       text file of extra block hashes to fetch, one per line
+  --max-attempts <n>   peers that may fail on one block before giving up (default 10)
   --max-file-mb <n>    blk file rollover size in MiB          (default 128)
   --no-witness         request stripped (non-witness) blocks
   --no-checksum        skip per-message checksum verification
@@ -406,7 +431,27 @@ refuse to touch a directory holding blk*.dat files it did not create.");
 
             Console.WriteLine();
             Console.WriteLine("wrote " + _blocksWritten + " blocks, " + (_bytesWritten / 1024.0 / 1024.0).ToString("F1") + " MB");
+            Console.WriteLine("retried " + Interlocked.Read(ref _retried) + " blocks off the retry lane");
             Console.WriteLine("index: " + Path.Combine(_opt.OutputDirectory, "blocks.index"));
+
+            // Do not report a clean finish while blocks are still queued. Silence here is exactly
+            // how a run with holes in it used to look like a run that worked.
+            int unfetched = _work.Count + _retry.Count;
+            if (unfetched > 0)
+            {
+                Console.WriteLine();
+                Console.WriteLine("INCOMPLETE: " + unfetched + " blocks were never fetched ("
+                                  + _retry.Count + " of them waiting on a retry)");
+                Console.WriteLine("re-run the same command to pick them up - they queue ahead of everything else");
+            }
+
+            if (!_abandoned.IsEmpty)
+            {
+                Console.WriteLine();
+                Console.WriteLine("gave up on " + _abandoned.Count + " blocks after "
+                                  + _opt.MaxAttemptsPerBlock + " attempts each:");
+                foreach (byte[] hash in _abandoned) Console.WriteLine("  " + ToDisplayHex(hash));
+            }
         }
 
         void SeedGenesis(HeaderChain chain)
@@ -580,9 +625,15 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                         int idleTicks = 0;
                         while (!ct.IsCancellationRequested)
                         {
+                            // Retries first: those blocks have already cost one peer's worth of
+                            // waiting, and every other block in _work is still untried.
                             var fresh = new List<byte[]>();
-                            while (inFlight.Count + fresh.Count < _opt.InFlightPerPeer && _work.TryDequeue(out var next))
+                            while (inFlight.Count + fresh.Count < _opt.InFlightPerPeer)
+                            {
+                                byte[]? next;
+                                if (!_retry.TryDequeue(out next) && !_work.TryDequeue(out next)) break;
                                 fresh.Add(next);
+                            }
 
                             if (fresh.Count > 0)
                             {
@@ -641,12 +692,37 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                 finally
                 {
                     peer?.Dispose();
-                    foreach (var h in inFlight) _work.Enqueue(h);   // hand unfinished work back
+                    foreach (var h in inFlight) Requeue(h);         // hand unfinished work back
                 }
 
-                if (_work.IsEmpty && Interlocked.Read(ref _remaining) > 0)
+                if (_work.IsEmpty && _retry.IsEmpty && Interlocked.Read(ref _remaining) > 0)
                     await Task.Delay(250, ct);                      // someone else is still finishing
             }
+        }
+
+        /// <summary>
+        /// Puts a block back in the queue after the peer holding it went away. It goes on the
+        /// retry lane so the next free peer picks it up immediately.
+        ///
+        /// A block nobody will serve - a bad --extra hash, say - would otherwise bounce around the
+        /// lane forever, killing a peer each time and leaving _remaining stuck above zero so the
+        /// run never ends. After MaxAttemptsPerBlock tries it is given up on instead, and the
+        /// closing summary names it.
+        /// </summary>
+        void Requeue(byte[] hash)
+        {
+            int attempts = _attempts.AddOrUpdate(hash, 1, (_, previous) => previous + 1);
+
+            if (attempts >= _opt.MaxAttemptsPerBlock)
+            {
+                _abandoned.Add(hash);
+                Interlocked.Decrement(ref _remaining);      // or the workers would never exit
+                Console.WriteLine("giving up on " + ToDisplayHex(hash) + " after " + attempts + " attempts");
+                return;
+            }
+
+            Interlocked.Increment(ref _retried);
+            _retry.Enqueue(hash);
         }
 
         byte[] BuildGetData(List<byte[]> hashes)
@@ -711,9 +787,13 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                     eta = TimeSpan.FromSeconds(Interlocked.Read(ref _remaining) / blocksPerSec).ToString(@"hh\:mm\:ss");
                 }
 
+                string retryLane = "";
+                if (!_retry.IsEmpty) retryLane = "  " + _retry.Count + " retrying";
+
                 Console.WriteLine(blocks + " blocks  " + (bytes / 1024.0 / 1024.0 / 1024.0).ToString("F2") + " GB  "
                                   + mbPerSec.ToString("F1") + " MB/s  " + blocksPerSec.ToString("F0") + " blk/s  "
-                                  + _livePeers + " peers  " + Interlocked.Read(ref _remaining) + " left  eta " + eta);
+                                  + _livePeers + " peers  " + Interlocked.Read(ref _remaining) + " left" + retryLane
+                                  + "  eta " + eta);
             }
         }
 
