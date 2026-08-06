@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Security.Cryptography;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -9,6 +10,47 @@ namespace SatoshiSharpLib
 {
     public class Transaction
     {
+        /// <summary>
+        /// The txid: SHA-256 applied twice to the stripped (no witness) serialization.
+        ///
+        /// Held little-endian, the order it is stored in on disk and the same order TxInput.TxId
+        /// uses - so an input's TxId can be compared straight against the Hash of the transaction
+        /// it spends from. Explorers show it reversed, so reverse a copy to display it.
+        ///
+        /// Left as 32 zero bytes on a transaction nobody has parsed.
+        /// </summary>
+        public byte[] Hash { get; set; } = new byte[32];
+
+        /// <summary>
+        /// The txid of an already-serialized transaction. Pass the STRIPPED bytes - version,
+        /// inputs, outputs, locktime, with no segwit marker, flag or witness stacks - since the
+        /// txid deliberately does not commit to witness data.
+        /// </summary>
+        public static byte[] ComputeHash(ReadOnlySpan<byte> strippedBytes)
+        {
+            Span<byte> first = stackalloc byte[32];
+            SHA256.HashData(strippedBytes, first);
+
+            byte[] second = new byte[32];
+            SHA256.HashData(first, second);
+            return second;
+        }
+
+        /// <summary>
+        /// The txid the way an explorer shows it - Hash reversed, lowercase hex. Printing Hash
+        /// itself gives the bytes in the order they are stored, which is this string backwards and
+        /// looks like a completely different hash.
+        ///
+        /// So for block 170's second transaction:
+        ///   GetHashAsString()             f4184fc596403b9d638783cf57adfe4c75c605f6356fbc91338530e9831e9e16
+        ///   Convert.ToHexString(Hash)     169e1e83e930853391bc6f35f605c6754cfead57cf8387639d3b4096c54f18f4
+        ///
+        /// Named to match Header.GetMerkleRootAsString(), which does the same thing for the root.
+        /// </summary>
+        public string GetHashAsString()
+        {
+            return Helpers.GetStringReverseHexBytes(Hash);
+        }
         public class TxInput
         {
             public byte[] TxId { get; set; } // 32 bytes, little-endian
@@ -60,7 +102,7 @@ namespace SatoshiSharpLib
 
         public override string ToString()
         {
-            string result = $"Version: {Version}\nInputs: {Inputs.Count}\n";
+            string result = $"TxId: {GetHashAsString()}\nVersion: {Version}\nInputs: {Inputs.Count}\n";
             for (int i = 0; i < Inputs.Count; i++)
             {
                 result += $"\nInput #{i}:\n{Inputs[i]}\n";
@@ -230,6 +272,11 @@ vMerkleTree: 4a5e1e
                 }
 
                 tx.LockTime = reader.ReadUInt32();
+
+                // Everything is read, so the transaction can be written back out and hashed. This
+                // path reads from a BinaryReader rather than an array, so there is no slice of the
+                // original bytes to hash instead.
+                tx.Hash = ComputeHash(tx.SerializeTransaction());
 
                 return tx;
             }

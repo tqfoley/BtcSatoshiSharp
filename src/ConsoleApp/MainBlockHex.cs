@@ -10,6 +10,10 @@ using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
 
+// Block, Block.Header, Transaction and Helpers - the parsed side of a block, as opposed to the
+// BlockRaw below, which is only ever bytes plus where they were found.
+using SatoshiSharpLib;
+
 // The longest-chain harness lives in ConsoleApp.LongestChainHarness, and MyRawBlock / MyBlock /
 // ChainState are nested inside it. `using static` pulls the nested types and the static methods in
 // unqualified, so BuildLongestChain(...) and MyRawBlock<byte[]> below read the same here as they do
@@ -368,9 +372,12 @@ namespace main4
 
                 MyBlock<BlockRaw>? currentBlock = state.blockZero;
                 string? prevhash = null;
+
+                MyBlock<BlockRaw>? blockAtHeight119221 = null;
+
                 while (currentBlock != null)
                 {
-                    Console.WriteLine("height " + currentBlock.height + " " + currentBlock.hash);
+                    //Console.WriteLine("height " + currentBlock.height + " " + currentBlock.hash);
                     if(prevhash != null && prevhash != currentBlock.prevHash)
                     {
                         Console.WriteLine("error: prevhash " + prevhash + " does not match currentBlock.prevHash " + currentBlock.prevHash);
@@ -378,24 +385,129 @@ namespace main4
                     }
                     prevhash = currentBlock.hash;
                     currentBlock = currentBlock.nextLink;
+                    if(currentBlock != null && currentBlock.height == 119221)
+                    {
+                        blockAtHeight119221 = currentBlock;
+                    }
                 }
 
                 MyBlock<BlockRaw>? currBlock = state.blockZero;
                 while (currBlock != null)
                 {
+                    if(currBlock.data.Size > 550)
+                    {
+                        //Console.WriteLine("large blockdata at height " + currBlock.height + " size " + currBlock.data.Size);
+                    }
                     //Console.WriteLine(currBlock.hash + " -> " + currBlock.prevHash);
                     currBlock = currBlock.nextLink;
                 }
 
 
-                ReportState(state);
+                //get block with height 119221
+
+                Block parsedblockAtHeight119221 = ParseBlock(blockAtHeight119221!.data!, 119221);
+
+                //ReportState(state);
+                foreach(var t in parsedblockAtHeight119221.Transactions)
+                {
+                    // Not Convert.ToHexString(t.Hash) - that prints the bytes in the order they are
+                    // stored, which is this string backwards. GetHashAsString does the reversing.
+                    Console.WriteLine("tx hash: " + t.GetHashAsString());
+                }
+
+                // Walk the longest chain and parse each block's bytes into a SatoshiSharpLib.Block,
+                // so header and Transactions are filled in rather than just the raw bytes sitting
+                // in BlockRaw.Raw. blockZero -> nextLink is chain order, so header.BlockNumber ends
+                // up being the real height.
+                var parseClock = Stopwatch.StartNew();
+                List<Block> parsedChain = new List<Block>();
+
+                long totalTransactions = 0;
+                long totalInputs = 0;
+                long totalOutputs = 0;
+                ulong totalOutputSats = 0;
+                int merkleMismatches = 0;
+
+                List<Transaction> allTransactions = new List<Transaction>();
+
+                MyBlock<BlockRaw>? atBlock = state.blockZero;
+                while (atBlock != null)
+                {
+                    Block parsed = ParseBlock(atBlock.data, atBlock.height);
+                    parsedChain.Add(parsed);
+
+                    foreach (Transaction tx in parsed.Transactions)
+                    {
+                        allTransactions.Add(tx);
+                    }
+
+                    totalTransactions += parsed.Transactions.Count;
+                    foreach (Transaction tx in parsed.Transactions)
+                    {
+                        totalInputs += tx.Inputs.Count;
+                        totalOutputs += tx.Outputs.Count;
+                        foreach (Transaction.TxOutput output in tx.Outputs)
+                        {
+                            totalOutputSats += output.Value;
+                        }
+                    }
+
+                    // Counted rather than thrown on: one bad block should not take the whole run
+                    // down when 119,000 others are fine.
+                    if (!MerkleRootMatches(parsed))
+                    {
+                        merkleMismatches++;
+                        if (merkleMismatches <= 5)
+                        {
+                            Console.WriteLine("merkle mismatch at height " + parsed.header.BlockNumber
+                                              + " " + parsed.header.Hash);
+                        }
+                    }
+
+                    atBlock = atBlock.nextLink;
+                }
+                parseClock.Stop();
 
 
 
+                Console.WriteLine("parsed " + parsedChain.Count + " blocks in "
+                                  + parseClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+                Console.WriteLine("  transactions : " + totalTransactions);
+                Console.WriteLine("  inputs       : " + totalInputs);
+                Console.WriteLine("  outputs      : " + totalOutputs);
+                Console.WriteLine("  output value : " + (totalOutputSats / 100000000.0).ToString("F8") + " BTC");
+                Console.WriteLine("  merkle roots : " + (parsedChain.Count - merkleMismatches)
+                                  + " of " + parsedChain.Count + " match");
 
 
+                // Two things this has to get right. The hex is in display order, so it needs
+                // reversing to match t.Hash, which is stored little-endian. And byte[] has to be
+                // compared element by element - `==` on arrays is reference equality, so comparing
+                // two different arrays that hold identical bytes is always false.
+                byte[] myhash = Convert.FromHexString("382f663b0554c5986b295eec475166592c3c638e61afe7d7a2ea2100935ba3a6");
+                Array.Reverse(myhash);
 
+                foreach (var t in allTransactions)
+                {
+                    if (t.Hash.AsSpan().SequenceEqual(myhash))
+                    {
+                        Console.WriteLine("found transaction " + t.GetHashAsString());
+                        Console.WriteLine("  inputs: " + t.Inputs.Count);
+                        foreach (var input in t.Inputs)
+                        {
+                            //Console.WriteLine("    input prev tx: " + input.PrevTxHash + " index: " + input.PrevTxIndex);
+                        }
+                        Console.WriteLine("  outputs: " + t.Outputs.Count);
+                        foreach (var output in t.Outputs)
+                        {
+                            Console.WriteLine("    output value: " + output.Value + " script: " + Convert.ToHexString(output.ScriptPubKey).ToLowerInvariant());
+                        }
+                    }
+                }
 
+                Console.WriteLine("total transactions: " + allTransactions.Count);
+
+                // print transaction with 382f663b0554c5986b295eec475166592c3c638e61afe7d7a2ea2100935ba3a6 here
 
                 /*
 
@@ -1978,6 +2090,442 @@ Examples:
         public static int CountBlocksInFile(string directory, int fileIndex)
         {
             return CountBlocksInFile(BlkFilePath(directory, fileIndex));
+        }
+
+        // ------------------------------------------------------------------------------------
+        // Raw bytes -> a parsed SatoshiSharpLib.Block
+        // ------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Turns the bytes of one block into a Block with its header and Transactions filled in.
+        ///
+        /// The layout after the 80 byte header is a varint transaction count and then that many
+        /// transactions back to back, each of them:
+        ///
+        ///     version[4] inCount[varint] (txid[32] vout[4] scriptSig[varint+n] sequence[4])*
+        ///                outCount[varint] (value[8] scriptPubKey[varint+n])* lockTime[4]
+        ///
+        /// blockNumber is written to header.BlockNumber - pass the height, since nothing in the
+        /// bytes themselves says where the block sits in the chain.
+        ///
+        /// Note this does NOT go through Transaction.readTransactionBytes. That one calls
+        /// Helpers.readSignedSpend on every output, which assumes bare P2PK (it strips one leading
+        /// and one trailing byte to get a pubkey), prints three lines per output, and throws on a
+        /// script shorter than two bytes. Fine for the genesis era it was written for; over a whole
+        /// file it is both wrong and unusably slow. Use that path when the wallet tracking is what
+        /// you are after - this one when you want the transactions.
+        /// </summary>
+        public static Block ParseBlock(BlockRaw raw, int blockNumber)
+        {
+            if (raw is null) throw new ArgumentNullException(nameof(raw));
+
+            Block block = new Block();
+            block.header = Block.Header.Parse(raw.Raw);        // reads the first 80 bytes
+            block.header.BlockNumber = blockNumber;
+            block.header.Hash = raw.DisplayHash;               // already computed when it was read
+
+            int pos = 80;
+            ulong txCount = ReadVarInt(raw.Raw, ref pos);
+            block.header.TransactionCount = txCount;
+
+            for (ulong i = 0; i < txCount; i++)
+            {
+                block.Transactions.Add(ReadTransaction(raw.Raw, ref pos));
+            }
+
+            // The record's size field already said where this block ends, so landing anywhere else
+            // means the walk went wrong. Without this a short read surfaces much later as a merkle
+            // mismatch, with nothing to say which transaction lost the thread.
+            if (pos != raw.Raw.Length)
+            {
+                throw new InvalidDataException("block " + raw.DisplayHash + ": " + txCount
+                                               + " transactions ran to byte " + pos + " of " + raw.Raw.Length);
+            }
+            //block 1 transaction hash 0e3e2357e806b6cdb1f70b54c3a3a17b6714ee1f0e68bebb44a74b1efd512098
+            return block;
+        }
+
+        /// <summary>
+        /// Reads one transaction starting at pos and leaves pos on the byte after it.
+        /// </summary>
+        static Transaction ReadTransaction(byte[] data, ref int pos)
+        {
+            var tx = new Transaction();
+
+            int start = pos;                                   // kept so the txid can be hashed
+
+            tx.Version = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(pos, 4));
+            pos += 4;
+
+            // BIP144: a real transaction always has at least one input, so a zero where the input
+            // count belongs is the segwit marker, with the flag byte behind it. Nothing in this
+            // data is segwit - it activated at height 481,824 - but MainBlockDownload asks peers
+            // for witness serialization, so a modern block would otherwise parse into nonsense.
+            bool hasWitness = false;
+            if (data[pos] == 0x00)
+            {
+                hasWitness = true;
+                pos += 2;                                      // marker 0x00, flag 0x01
+            }
+
+            ulong inputCount = ReadVarInt(data, ref pos);
+            for (ulong i = 0; i < inputCount; i++)
+            {
+                var input = new Transaction.TxInput();
+
+                input.TxId = data.AsSpan(pos, 32).ToArray();
+                pos += 32;
+                input.Vout = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(pos, 4));
+                pos += 4;
+
+                ulong scriptLength = ReadVarInt(data, ref pos);
+                input.ScriptSig = data.AsSpan(pos, (int)scriptLength).ToArray();
+                pos += (int)scriptLength;
+
+                input.Sequence = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(pos, 4));
+                pos += 4;
+
+                tx.Inputs.Add(input);
+            }
+
+            ulong outputCount = ReadVarInt(data, ref pos);
+            for (ulong i = 0; i < outputCount; i++)
+            {
+                var output = new Transaction.TxOutput();
+
+                output.Value = BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(pos, 8));
+                pos += 8;
+
+                ulong scriptLength = ReadVarInt(data, ref pos);
+                output.ScriptPubKey = data.AsSpan(pos, (int)scriptLength).ToArray();
+                pos += (int)scriptLength;
+
+                tx.Outputs.Add(output);
+            }
+
+            if (hasWitness)
+            {
+                // Stepped over rather than kept: Transaction has nowhere to put witness data, and
+                // it is not part of the txid, so dropping it leaves the merkle root correct.
+                for (ulong i = 0; i < inputCount; i++)
+                {
+                    ulong items = ReadVarInt(data, ref pos);
+                    for (ulong j = 0; j < items; j++)
+                    {
+                        ulong length = ReadVarInt(data, ref pos);
+                        pos += (int)length;
+                    }
+                }
+            }
+
+            tx.LockTime = BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(pos, 4));
+            pos += 4;
+
+            // Without a witness the bytes just walked over ARE the stripped serialization, so the
+            // txid is a hash of that slice - no need to build the transaction back up again. With
+            // one they are not: the txid has to skip the marker, flag and witness stacks, which is
+            // exactly what SerializeTransaction leaves out.
+            if (hasWitness)
+            {
+                tx.Hash = Transaction.ComputeHash(tx.SerializeTransaction());
+            }
+            else
+            {
+                tx.Hash = Transaction.ComputeHash(data.AsSpan(start, pos - start));
+            }
+
+            return tx;
+        }
+
+        /// <summary>
+        /// Re-serializes every transaction, rebuilds the merkle root from them and compares it to
+        /// the one in the header. This is the check that the transaction walk read exactly the
+        /// right bytes: any input or output whose length was misread changes a txid, and a changed
+        /// txid changes the root.
+        /// </summary>
+        public static bool MerkleRootMatches(Block block)
+        {
+            if (block.Transactions.Count == 0) return false;
+
+            var serialized = new List<byte[]>(block.Transactions.Count);
+            foreach (Transaction tx in block.Transactions)
+            {
+                serialized.Add(tx.SerializeTransaction());
+            }
+
+            byte[] computed = Block.CalculateMerkleRoot(serialized);
+
+            return string.Equals(Helpers.GetStringReverseHexBytes(computed),
+                                 block.header.GetMerkleRootAsString(),
+                                 StringComparison.OrdinalIgnoreCase);
+        }
+
+        // ------------------------------------------------------------------------------------
+        // End to end check of a blk file
+        // ------------------------------------------------------------------------------------
+
+        /// <summary>
+        /// Blocks whose height on mainnet is not in doubt, used to check that the heights the
+        /// harness works out are real Bitcoin heights and not just a counter that starts somewhere.
+        /// Display order, the way an explorer shows them.
+        /// </summary>
+        static readonly Dictionary<int, string> KnownMainnetHeights = new Dictionary<int, string>
+        {
+            [0]  = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+            [1]  = "00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048",
+            [32] = "00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3",
+            [33] = "00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962",
+            [34] = "00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f",
+        };
+
+        /// <summary>
+        /// Reads one blk file, builds the longest chain out of it, parses every block on that chain
+        /// and checks the result. Prints a report; returns false if any check failed.
+        ///
+        /// What each step actually proves:
+        ///   - ReadAllBlocks and CountBlocksInFile agree on how many blocks the file holds, so the
+        ///     bulk read is not quietly stopping early,
+        ///   - the chain links up - every block's prevHash is the block before it, walking forwards
+        ///     from blockZero, and that walk ends on possibleTip,
+        ///   - the heights are real Bitcoin heights, checked against hashes known from mainnet,
+        ///   - the transaction walk is byte exact: every merkle root is rebuilt from the parsed
+        ///     transactions and compared to the one in the header, which no misread script length
+        ///     can survive.
+        ///
+        /// Blocks are fed to the harness under their full 64 character hashes rather than a
+        /// shortened tail, so ChainState.rootPrevHash has to be the 64 zero string for genesis to
+        /// be recognised as a root instead of parking forever on a parent nobody has.
+        ///
+        /// traceChainBuild leaves the harness's per block tracing on. It is off by default because
+        /// a full file is over a hundred thousand lines of it.
+        /// </summary>
+        public static bool VerifyBlockFile(string directory, int fileIndex, bool traceChainBuild = false)
+        {
+            bool allPassed = true;
+
+            // 1. Read the file, and check the two readers agree.
+            var clock = Stopwatch.StartNew();
+            List<BlockRaw> all = ReadAllBlocks(directory, fileIndex);
+            clock.Stop();
+
+            int counted = CountBlocksInFile(directory, fileIndex);
+
+            Console.WriteLine(BlkFilePath(directory, fileIndex));
+            Console.WriteLine("  read         : " + all.Count + " blocks in "
+                              + clock.Elapsed.TotalSeconds.ToString("F2") + "s");
+            if (counted != all.Count)
+            {
+                Console.WriteLine("  FAILED       : CountBlocksInFile says " + counted
+                                  + ", ReadAllBlocks says " + all.Count);
+                allPassed = false;
+            }
+
+            // 2. Build the longest chain. Genesis has 64 zeros where a parent would go.
+            var state = new ChainState<BlockRaw>();
+            state.rootPrevHash = NoParentHash;
+
+            TextWriter console = Console.Out;
+            if (!traceChainBuild)
+            {
+                Console.SetOut(TextWriter.Null);
+            }
+            clock.Restart();
+            try
+            {
+                foreach (BlockRaw raw in all)
+                {
+                    BuildLongestChain(new MyRawBlock<BlockRaw>
+                    {
+                        hash = raw.DisplayHash,
+                        prevHash = raw.GetPrevBlockHash(),
+                        data = raw
+                    }, state);
+                }
+                SetNextLinks(state);
+            }
+            finally
+            {
+                Console.SetOut(console);
+            }
+            clock.Stop();
+
+            if (state.blockZero == null || state.possibleTip == null)
+            {
+                Console.WriteLine("  FAILED       : nothing linked up - no blockZero or no tip");
+                return false;
+            }
+
+            Console.WriteLine("  chain built  : " + clock.Elapsed.TotalSeconds.ToString("F2") + "s, "
+                              + state.waitingOnParent.Count + " still parked");
+            Console.WriteLine("  blockZero    : " + state.blockZero.hash + " at height " + state.blockZero.height);
+            Console.WriteLine("  possibleTip  : " + state.possibleTip.hash + " at height " + state.possibleTip.height);
+            Console.WriteLine("  cache        : " + RecentCacheStats<BlockRaw>() + " of parent lookups");
+
+            // 3. Walk it forwards, checking the links and the known heights as we go, and parse
+            //    each block on the way past so the file is only walked once.
+            clock.Restart();
+
+            int walked = 0;
+            int merkleMismatches = 0;
+            int heightsChecked = 0;
+            int singleTxBlocks = 0;
+            int txHashMismatches = 0;
+            long totalTransactions = 0;
+            long totalInputs = 0;
+            long totalOutputs = 0;
+            ulong totalOutputSats = 0;
+            string? previousHash = null;
+            Block? genesis = null;
+
+            MyBlock<BlockRaw>? at = state.blockZero;
+            while (at != null)
+            {
+                if (previousHash != null && at.prevHash != previousHash)
+                {
+                    Console.WriteLine("  FAILED       : height " + at.height + " names parent "
+                                      + at.prevHash + ", but the block before it is " + previousHash);
+                    allPassed = false;
+                }
+                previousHash = at.hash;
+
+                string knownHash;
+                if (KnownMainnetHeights.TryGetValue(at.height, out knownHash))
+                {
+                    heightsChecked++;
+                    if (at.hash != knownHash)
+                    {
+                        Console.WriteLine("  FAILED       : height " + at.height + " is " + at.hash
+                                          + ", mainnet has " + knownHash);
+                        allPassed = false;
+                    }
+                }
+
+                Block parsed = ParseBlock(at.data, at.height);
+                if (at.height == 0)
+                {
+                    genesis = parsed;
+                }
+
+                totalTransactions += parsed.Transactions.Count;
+                foreach (Transaction tx in parsed.Transactions)
+                {
+                    totalInputs += tx.Inputs.Count;
+                    totalOutputs += tx.Outputs.Count;
+                    foreach (Transaction.TxOutput output in tx.Outputs)
+                    {
+                        totalOutputSats += output.Value;
+                    }
+                }
+
+                // A block holding one transaction has that transaction's txid as its merkle root,
+                // so this checks the Hash the parser worked out against something the header
+                // already committed to - and most of the early chain is one-transaction blocks.
+                if (parsed.Transactions.Count == 1)
+                {
+                    singleTxBlocks++;
+                    if (!string.Equals(ToDisplayHex(parsed.Transactions[0].Hash),
+                                       parsed.header.GetMerkleRootAsString(),
+                                       StringComparison.OrdinalIgnoreCase))
+                    {
+                        txHashMismatches++;
+                        if (txHashMismatches <= 5)
+                        {
+                            Console.WriteLine("  txid bad     : height " + parsed.header.BlockNumber
+                                              + " " + ToDisplayHex(parsed.Transactions[0].Hash));
+                        }
+                    }
+                }
+
+                // Counted rather than thrown on, so one bad block does not hide the state of the
+                // other hundred thousand.
+                if (!MerkleRootMatches(parsed))
+                {
+                    merkleMismatches++;
+                    if (merkleMismatches <= 5)
+                    {
+                        Console.WriteLine("  merkle bad   : height " + parsed.header.BlockNumber
+                                          + " " + parsed.header.Hash);
+                    }
+                }
+
+                walked++;
+                at = at.nextLink;
+            }
+            clock.Stop();
+
+            if (previousHash != state.possibleTip.hash)
+            {
+                Console.WriteLine("  FAILED       : the walk from blockZero ended on " + previousHash
+                                  + ", not on the tip");
+                allPassed = false;
+            }
+
+            Console.WriteLine("  walked       : " + walked + " blocks parsed in "
+                              + clock.Elapsed.TotalSeconds.ToString("F2") + "s");
+            Console.WriteLine("  transactions : " + totalTransactions);
+            Console.WriteLine("  inputs       : " + totalInputs + ", outputs " + totalOutputs);
+            Console.WriteLine("  output value : " + (totalOutputSats / 100000000.0).ToString("F8") + " BTC");
+            Console.WriteLine("  heights      : " + heightsChecked + " checked against mainnet");
+
+            if (merkleMismatches == 0)
+            {
+                Console.WriteLine("  merkle roots : all " + walked + " match");
+            }
+            else
+            {
+                Console.WriteLine("  merkle roots : " + merkleMismatches + " of " + walked + " DO NOT match");
+                allPassed = false;
+            }
+
+            if (txHashMismatches == 0)
+            {
+                Console.WriteLine("  txids        : all " + singleTxBlocks
+                                  + " one-transaction blocks agree with their merkle root");
+            }
+            else
+            {
+                Console.WriteLine("  txids        : " + txHashMismatches + " of " + singleTxBlocks
+                                  + " DO NOT match their merkle root");
+                allPassed = false;
+            }
+
+            // 4. Genesis is worth its own look: one coinbase paying 50 BTC, carrying the headline.
+            if (genesis != null)
+            {
+                Transaction coinbase = genesis.Transactions[0];
+                string scriptText = System.Text.Encoding.ASCII.GetString(coinbase.Inputs[0].ScriptSig);
+                bool headline = scriptText.Contains("Chancellor on brink of second bailout for banks");
+
+                // The genesis coinbase txid, which every explorer agrees on. It is also the one
+                // txid that is NOT spendable, but that does not change what it hashes to.
+                const string GenesisTxId = "4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b";
+                string coinbaseTxId = ToDisplayHex(coinbase.Hash);
+
+                Console.WriteLine("  genesis      : " + genesis.Transactions.Count + " tx, "
+                                  + coinbase.Outputs[0].Value + " sats, headline present " + headline);
+                Console.WriteLine("  genesis txid : " + coinbaseTxId);
+
+                if (coinbase.Outputs[0].Value != 5000000000 || !headline)
+                {
+                    Console.WriteLine("  FAILED       : genesis coinbase is not what it should be");
+                    allPassed = false;
+                }
+
+                if (coinbaseTxId != GenesisTxId)
+                {
+                    Console.WriteLine("  FAILED       : genesis txid should be " + GenesisTxId);
+                    allPassed = false;
+                }
+            }
+
+            string result = "FAILURES above";
+            if (allPassed)
+            {
+                result = "all checks passed";
+            }
+            Console.WriteLine("  result       : " + result);
+
+            return allPassed;
         }
 
         /// <summary>

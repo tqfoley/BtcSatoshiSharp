@@ -486,3 +486,27 @@ Two unrelated things I noticed while testing, not touched:
 - The retry lane fired again on this download: retried 16 blocks off the retry lane, and the run finished with zero gaps.
 
 
+
+
+tqfoley todo
+
+
+That last line is the old code — confirming it was silently finding nothing, not finding the wrong thing.
+
+Which helper does what
+
+┌─────────────────────────────────────────┬───────────┬─────────────────┐
+│                  Call                   │ Reverses? │      Case       │
+├─────────────────────────────────────────┼───────────┼─────────────────┤
+│ Convert.ToHexString(bytes)              │ no        │ UPPER           │
+├─────────────────────────────────────────┼───────────┼─────────────────┤
+│ Helpers.ByteArrayToHexString(bytes)     │ no        │ UPPER           │
+├─────────────────────────────────────────┼───────────┼─────────────────┤
+│ Helpers.GetStringReverseHexBytes(bytes) │ yes       │ lower           │
+├─────────────────────────────────────────┼───────────┼─────────────────┤
+│ Helpers.ReverseHexString(hexString)     │ yes       │ preserves input │
+├─────────────────────────────────────────┼───────────┼─────────────────┤
+│ tx.GetHashAsString()                    │ yes       │ lower           │
+├─────────────────────────────────────────┼───────────┼─────────────────┤
+│ header.GetMerkleRootAsString()          │ yes       │ UPPER           │
+└─────────────────────────────────────────┴───────────┴─────────────────┘
