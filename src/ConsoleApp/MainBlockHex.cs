@@ -9,10 +9,8 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
-
-// Block, Block.Header, Transaction and Helpers - the parsed side of a block, as opposed to the
-// BlockRaw below, which is only ever bytes plus where they were found.
 using SatoshiSharpLib;
+using RocksDbSharp;
 
 // The longest-chain harness lives in ConsoleApp.LongestChainHarness, and MyRawBlock / MyBlock /
 // ChainState are nested inside it. `using static` pulls the nested types and the static methods in
@@ -155,480 +153,658 @@ namespace main4
 
         static int Main(string[] args)
         {
-            var req = new Request();
-
-            try
+            bool rocksDbLoaded = false;
+            if(!rocksDbLoaded)
             {
-                if (!ParseArgs(args, req))
+                Console.WriteLine("rocksdb not loaded");
+
+                var req = new Request();
+
+                try
                 {
-                    PrintUsage();      // --help
-                    return 0;
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine("argument error: " + ex.Message);
-                PrintUsage();
-                return 2;
-            }
-
-            try
-            {
-                Request reqBlock3ByHash = new Request();
-                reqBlock3ByHash.FileIndex = 0;
-                reqBlock3ByHash.Hash = Block3Hash;
-
-                Request reqBlock3ByIndex = new Request();
-                reqBlock3ByIndex.FileIndex = 0;
-                reqBlock3ByIndex.BlockIndex = 3;
-
-
-                int scanned;
-                int scannedByHash;
-                int scannedByIndex;
-                BlockRaw? foundByHash = FindBlockByHash(@"C:\btcblock\claudeblocks", reqBlock3ByHash.FileIndex, reqBlock3ByHash.Hash, out scannedByHash);
-                BlockRaw? foundByIndex = FindBlockByPosition(@"C:\btcblock\claudeblocks", reqBlock3ByIndex.FileIndex, reqBlock3ByIndex.BlockIndex, out scannedByIndex);
-
-
-                if (foundByHash != foundByIndex)
-                {
-                    Console.WriteLine("error: foundByHash and foundByIndex do not match");
-                }
-
-                if (foundByHash == null || foundByIndex == null)
-                {
-                    Console.WriteLine("error: block 3 was not found both ways, nothing to summarize");
-                }
-                else
-                {
-                    PrintSummary(foundByHash, scannedByHash);
-                    PrintSummary(foundByIndex, scannedByIndex);
-                }
-
-
-                //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00001.dat", 10);
-                //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00002.dat", 10);
-                //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00003.dat", 10);
-                //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00004.dat", 10);
-
-
-                // order ALL .dat files by timestamp
-                if (false)
-                {
-                    var files = new List<string>();
-                    foreach (string file in Directory.EnumerateFiles(@"C:\btcblock\claudeblocks", "blk*.dat"))
+                    if (!ParseArgs(args, req))
                     {
-                        // A three-character extension in the pattern is treated as a PREFIX match on Windows,
-                        // so "*.dat" also hands back blk00000.database. Check the real ending.
-                        if (!file.EndsWith(".dat", StringComparison.OrdinalIgnoreCase)) continue;
-                        files.Add(file);
-                    }
-                    foreach (string file in files)
-                    {
-                        Console.WriteLine("found blk file: " + file);
-                        SortBlockFileByTimestamp(file);
+                        PrintUsage();      // --help
+                        return 0;
                     }
                 }
-
-
-
-
-
-
-                if (false)
+                catch (Exception ex)
                 {
-                    DeleteAllFilesIn("C:\\btcblock\\inOrder\\");
+                    Console.Error.WriteLine("argument error: " + ex.Message);
+                    PrintUsage();
+                    return 2;
                 }
 
-
-                //claude's fake block 33 raw date 01000000e3f6664d5af37062b934f983ed1033e2011b42c9b04735276c7ccbe50000000033c56986d991564d8f2e5d6b3b98105c882a5b108738d0994407de8b72935ac4efc86849ffff001df9649d460101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1d04ffff001d12414c5433332f464f524b2d464958545552450400000000ffffffff0100f2052a01000000434104804d71f6a91c908a973cae7ef4363f7689520116b995d6936328de00be56f92baee0dabf3a240e0ed2dce7f374f12cbba7649808528236cb04c558f028dd61edac00000000
-                //claude's fake block 33 hash    0000000096a151f27d9cd2d706b6b8e16ba43e7e290bbb77f9eff8fe1d20c66c parent  00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3   ← identical to real block 33 time    1231603951(12s after the real block) nonce   1184720121 bits    1d00ffff(unchanged — difficulty is consensus -fixed in this epoch)
-                                                                       //01234567 123456789012345678901234567890123456789012345678901234567890123 123456789012345678901234567890123456789012345678901234567890123                                                                                                                            01234567890123456789012345678901234567890123
-                string fakeBlock33 = "{\"data\":{\"33\":{\"raw_block\":\"01000000e3f6664d5af37062b934f983ed1033e2011b42c9b04735276c7ccbe50000000033c56986d991564d8f2e5d6b3b98105c882a5b108738d0994407de8b72935ac4efc86849ffff001df9649d460101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1d04ffff001d12414c5433332f464f524b2d464958545552450400000000ffffffff0100f2052a01000000434104804d71f6a91c908a973cae7ef4363f7689520116b995d6936328de00be56f92baee0dabf3a240e0ed2dce7f374f12cbba7649808528236cb04c558f028dd61edac00000000\",\"decoded_raw_block\":{\"hash\":\"0000000096a151f27d9cd2d706b6b8e16ba43e7e290bbb77f9eff8fe1d20c66c\",\"confirmations\":-1,\"height\":33,\"version\":1,\"versionHex\":\"00000001\",\"merkleroot\":\"c45a93728bde074499d03887105b2a885c10983b6b5d2e8f4d5691d98669c533\",\"time\":1231603951,\"mediantime\":1231601457,\"nonce\":1184720121,\"bits\":\"1d00ffff\",\"difficulty\":1,\"chainwork\":\"0000000000000000000000000000000000000000000000000000002200220022\",\"previousblockhash\":\"00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3\",\"strippedsize\":237,\"size\":237,\"weight\":948,\"nTx\":1,\"tx\":[\"c45a93728bde074499d03887105b2a885c10983b6b5d2e8f4d5691d98669c533\"]}}},\"context\":{\"code\":200,\"source\":\"SYNTHETIC\",\"results\":1,\"state\":960939,\"market_price_usd\":63703,\"cache\":{\"live\":false,\"duration\":120,\"since\":\"2026-08-04 03:37:36\",\"until\":\"2026-08-04 03:39:36\",\"time\":null},\"api\":{\"version\":\"2.0.95-ie\",\"last_major_update\":\"2022-11-07 02:00:00\",\"next_major_update\":\"2023-11-12 02:00:00\",\"documentation\":\"https://blockchair.com/api/docs\",\"notice\":\"SYNTHETIC FIXTURE - not a historical block and not served by any explorer. Locally mined competitor to block 33 for fork / stale-tip detection testing.\"},\"servers\":\"SYNTHETIC\",\"time\":0.006392955780029297,\"render_time\":0.0043070316314697266,\"full_time\":0.010699987411499023,\"request_cost\":1}}";
-                string jsonBlock33 = "{\"data\":{\"33\":{\"raw_block\":\"01000000e3f6664d5af37062b934f983ed1033e2011b42c9b04735276c7ccbe5000000001012aaab3e3bffd34055aaa157bf78792d5c18f085635eda7046d89c08a0eabde3c86849ffff001d228c22400101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0138ffffffff0100f2052a01000000434104804d71f6a91c908a973cae7ef4363f7689520116b995d6936328de00be56f92baee0dabf3a240e0ed2dce7f374f12cbba7649808528236cb04c558f028dd61edac00000000\",\"decoded_raw_block\":{\"hash\":\"00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962\",\"confirmations\":960926,\"height\":33,\"version\":1,\"versionHex\":\"00000001\",\"merkleroot\":\"bdeaa0089cd84670da5e6385f0185c2d7978bf57a1aa5540d3ff3b3eabaa1210\",\"time\":1231603939,\"mediantime\":1231601457,\"nonce\":1076005922,\"bits\":\"1d00ffff\",\"difficulty\":1,\"chainwork\":\"0000000000000000000000000000000000000000000000000000002200220022\",\"nTx\":1,\"previousblockhash\":\"00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3\",\"nextblockhash\":\"00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f\",\"strippedsize\":215,\"size\":215,\"weight\":860,\"tx\":[\"bdeaa0089cd84670da5e6385f0185c2d7978bf57a1aa5540d3ff3b3eabaa1210\"]}}},\"context\":{\"code\":200,\"source\":\"T+R\",\"results\":1,\"state\":960939,\"market_price_usd\":63703,\"cache\":{\"live\":true,\"duration\":120,\"since\":\"2026-08-04 03:37:36\",\"until\":\"2026-08-04 03:39:36\",\"time\":null},\"api\":{\"version\":\"2.0.95-ie\",\"last_major_update\":\"2022-11-07 02:00:00\",\"next_major_update\":\"2023-11-12 02:00:00\",\"documentation\":\"https:\\/\\/blockchair.com\\/api\\/docs\",\"notice\":\"Try out our new API v.3: https:\\/\\/3xpl.com\\/data\"},\"servers\":\"API4,BTC5,BTC5,BTC5\",\"time\":0.006392955780029297,\"render_time\":0.0043070316314697266,\"full_time\":0.010699987411499023,\"request_cost\":1}}";
-                // https://api.blockchair.com/bitcoin/raw/block/33
-                List<BlockRaw> missingBlock33 =  ReadBlocksFromJson(jsonBlock33);
-
-                string jsonBlock32 = "{\"data\":{\"32\":{\"raw_block\":\"01000000c4d369b723c2cf9be33cf00deb1dbfea0c8ccd12c415f29434ff009700000000c9c0fd0ae7b7973c42fc9e3dddc967b6e309570b720ff15414c08365f005992be3c56849ffff001d08e1c00d0101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0136ffffffff0100f2052a01000000434104b949980bb46aee11510519b4af0dfcc3cc7464b3ede15f184b7c8126a98bf6d6e698eaf16b938814174a002ba24daa03e59a7c0927248517b581c09ec70f216eac00000000\",\"decoded_raw_block\":{\"hash\":\"00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3\",\"confirmations\":961020,\"height\":32,\"version\":1,\"versionHex\":\"00000001\",\"merkleroot\":\"2b9905f06583c01454f10f720b5709e3b667c9dd3d9efc423c97b7e70afdc0c9\",\"time\":1231603171,\"mediantime\":1231570573,\"nonce\":230744328,\"bits\":\"1d00ffff\",\"difficulty\":1,\"chainwork\":\"0000000000000000000000000000000000000000000000000000002100210021\",\"nTx\":1,\"previousblockhash\":\"000000009700ff3494f215c412cd8c0ceabf1deb0df03ce39bcfc223b769d3c4\",\"nextblockhash\":\"00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962\",\"strippedsize\":215,\"size\":215,\"weight\":860,\"tx\":[\"2b9905f06583c01454f10f720b5709e3b667c9dd3d9efc423c97b7e70afdc0c9\"]}}},\"context\":{\"code\":200,\"source\":\"T+R\",\"results\":1,\"state\":961051,\"market_price_usd\":64049,\"cache\":{\"live\":true,\"duration\":120,\"since\":\"2026-08-04 17:57:58\",\"until\":\"2026-08-04 17:59:58\",\"time\":null},\"api\":{\"version\":\"2.0.95-ie\",\"last_major_update\":\"2022-11-07 02:00:00\",\"next_major_update\":\"2023-11-12 02:00:00\",\"documentation\":\"https:\\/\\/blockchair.com\\/api\\/docs\",\"notice\":\"Try out our new API v.3: https:\\/\\/3xpl.com\\/data\"},\"servers\":\"API4,BTC5,BTC5,BTC5\",\"time\":0.01161813735961914,\"render_time\":0.0032088756561279297,\"full_time\":0.01482701301574707,\"request_cost\":1}}";
-                List<BlockRaw> missingBlock32 = ReadBlocksFromJson(jsonBlock32);
-
-                string jsonBlock34 = "{\"data\":{\"34\":{\"raw_block\":\"01000000627985c0fc1a71e052a5af9420c9b99845432ae099f27a3dea7370a80000000074549b3151d6dd4ce77419d01710921b3211ed3280bf2e3af2c1f1a820063b2272ca6849ffff001d2243c0240101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0147ffffffff0100f2052a01000000434104180bfa57bff462c7641fa0b91efe29344a77086b073cd9c5f769cb2393acc151a4e7377eaabacc39f5b2bd2cd4bcb5ed1855939619e491c79c0bb5793d4edbf3ac00000000\",\"decoded_raw_block\":{\"hash\":\"00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f\",\"confirmations\":961018,\"height\":34,\"version\":1,\"versionHex\":\"00000001\",\"merkleroot\":\"223b0620a8f1c1f23a2ebf8032ed11321b921017d01974e74cddd651319b5474\",\"time\":1231604338,\"mediantime\":1231601503,\"nonce\":616579874,\"bits\":\"1d00ffff\",\"difficulty\":1,\"chainwork\":\"0000000000000000000000000000000000000000000000000000002300230023\",\"nTx\":1,\"previousblockhash\":\"00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962\",\"nextblockhash\":\"00000000b572a465b4e816420d47a16274557b3573b7924b64808a82c7322d9b\",\"strippedsize\":215,\"size\":215,\"weight\":860,\"tx\":[\"223b0620a8f1c1f23a2ebf8032ed11321b921017d01974e74cddd651319b5474\"]}}},\"context\":{\"code\":200,\"source\":\"T+R\",\"results\":1,\"state\":961051,\"market_price_usd\":64049,\"cache\":{\"live\":true,\"duration\":120,\"since\":\"2026-08-04 17:59:02\",\"until\":\"2026-08-04 18:01:02\",\"time\":null},\"api\":{\"version\":\"2.0.95-ie\",\"last_major_update\":\"2022-11-07 02:00:00\",\"next_major_update\":\"2023-11-12 02:00:00\",\"documentation\":\"https:\\/\\/blockchair.com\\/api\\/docs\",\"notice\":\"Try out our new API v.3: https:\\/\\/3xpl.com\\/data\"},\"servers\":\"API4,BTC5,BTC5,BTC5\",\"time\":0.009490013122558594,\"render_time\":0.003835916519165039,\"full_time\":0.013325929641723633,\"request_cost\":1}}";
-                List<BlockRaw> missingBlock34 = ReadBlocksFromJson(jsonBlock34);
-
-                List < BlockRaw > missingBlocks = new List<BlockRaw>();
-                missingBlocks.AddRange(missingBlock32);
-                missingBlocks.AddRange(missingBlock33);
-                missingBlocks.AddRange(missingBlock34);
-
-                // 30 00000000bc919cfb64f62de736d55cf79e3d535b474ace256b4fbb56073f64db
-                // 31 000000009700ff3494f215c412cd8c0ceabf1deb0df03ce39bcfc223b769d3c4
-                // 32 00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3
-                // 33 00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962
-                // 34 00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f
-
-                foreach (var f in missingBlocks)
+                try
                 {
-                    Console.WriteLine("0" + "***  " + f.GetUnixTime() + " " + f.GetPrevBlockHash().Substring(30) + " hash " + f.DisplayHash.Substring(30));
+                    Request reqBlock3ByHash = new Request();
+                    reqBlock3ByHash.FileIndex = 0;
+                    reqBlock3ByHash.Hash = Block3Hash;
 
-                }
+                    Request reqBlock3ByIndex = new Request();
+                    reqBlock3ByIndex.FileIndex = 0;
+                    reqBlock3ByIndex.BlockIndex = 3;
 
 
-                int currentIndex = 0;
-                string prevHash = "";
-                while (currentIndex < 111)
-                {
+                    int scanned;
+                    int scannedByHash;
+                    int scannedByIndex;
+                    BlockRaw? foundByHash = FindBlockByHash(@"C:\btcblock\claudeblocks", reqBlock3ByHash.FileIndex, reqBlock3ByHash.Hash, out scannedByHash);
+                    BlockRaw? foundByIndex = FindBlockByPosition(@"C:\btcblock\claudeblocks", reqBlock3ByIndex.FileIndex, reqBlock3ByIndex.BlockIndex, out scannedByIndex);
 
-                    foundByIndex = FindBlockByPosition(@"C:\btcblock\claudeblocks", 0, currentIndex, out scannedByIndex);
-                    if (foundByIndex!.DisplayHash == "00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3" ||
-                        foundByIndex!.DisplayHash == "00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962" ||
-                        foundByIndex!.DisplayHash == "00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f")
+
+                    if (foundByHash != foundByIndex)
                     {
-                        Console.WriteLine(currentIndex + "***  " + foundByIndex.GetUnixTime() +  " " + foundByIndex.GetPrevBlockHash().Substring(30) + " hash " + foundByIndex.DisplayHash.Substring(30));
-                        if(missingBlock32.First()! == foundByIndex!)
-                        {
-                            Console.WriteLine("match block 32");
+                        Console.WriteLine("error: foundByHash and foundByIndex do not match");
+                    }
 
-                        }
+                    if (foundByHash == null || foundByIndex == null)
+                    {
+                        Console.WriteLine("error: block 3 was not found both ways, nothing to summarize");
                     }
                     else
                     {
-                        if(prevHash != foundByIndex.GetPrevBlockHash())
+                        PrintSummary(foundByHash, scannedByHash);
+                        PrintSummary(foundByIndex, scannedByIndex);
+                    }
+
+
+                    //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00001.dat", 10);
+                    //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00002.dat", 10);
+                    //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00003.dat", 10);
+                    //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00004.dat", 10);
+
+
+                    // order ALL .dat files by timestamp
+                    if (false)
+                    {
+                        var files = new List<string>();
+                        foreach (string file in Directory.EnumerateFiles(@"C:\btcblock\claudeblocks", "blk*.dat"))
                         {
-                            Console.WriteLine(currentIndex + "     " + foundByIndex.GetUnixTime() + " " + foundByIndex.GetPrevBlockHash().Substring(30) + " hash " + foundByIndex.DisplayHash.Substring(30));
+                            // A three-character extension in the pattern is treated as a PREFIX match on Windows,
+                            // so "*.dat" also hands back blk00000.database. Check the real ending.
+                            if (!file.EndsWith(".dat", StringComparison.OrdinalIgnoreCase)) continue;
+                            files.Add(file);
                         }
-                        
-
-                    }
-                    prevHash = foundByIndex.DisplayHash;
-                    currentIndex++;
-
-                }
-
-
-
-
-                if (true)
-                {
-                    // assumes blocks in order
-
-                    int currentIndex2 = 0;
-                    BlockRaw prevFoundByIndex3 = null;
-                    while (currentIndex2 < 10)
-                    {
-
-                        foundByIndex = FindBlockByPosition("C:\\btcblock\\claudeblocks", 0, currentIndex2, out scannedByIndex);
-                        if (foundByIndex == null) break;      // file holds fewer blocks than this
-
-                       
-                                string h = foundByIndex.GetPrevBlockHash().Substring(40); 
-                                Console.WriteLine(currentIndex2 + "     " + h  + " " + foundByIndex.DisplayHash.Substring(40));
-
-                        currentIndex2++;
-                    }
-                }
-
-
-
-
-
-
-
-
-
-                Console.WriteLine("Longest Chain Harness");
-
-                List<MyRawBlock<BlockRaw>> rawBlocks = new List<MyRawBlock<BlockRaw>>();
-
-                // One pass over the file for all of them. Asking FindBlockByPosition for block 0,
-                // then block 1, and so on re-walks the file from the start every time, which is
-                // where the harness was spending its time - and it cannot run off the end here,
-                // since the file itself says how many blocks there are.
-                var readClock = Stopwatch.StartNew();
-                List<BlockRaw> allBlocks = ReadAllBlocks(@"C:\btcblock\claudeblocks", 0);
-                Console.WriteLine("blk00000.dat holds " + allBlocks.Count + " blocks, read in "
-                                  + readClock.Elapsed.TotalSeconds.ToString("F1") + "s");
-
-                foreach (BlockRaw block in allBlocks)
-                {
-                    rawBlocks.Add(new MyRawBlock<BlockRaw>
-                    {
-                        hash = block.DisplayHash.Substring(40),
-                        prevHash = block.GetPrevBlockHash().Substring(40),
-                        data = block
-                    });
-                }
-
-                ChainState<BlockRaw> state = new ChainState<BlockRaw>();
-
-                foreach (var rawBlock in rawBlocks)
-                {
-                    //Console.WriteLine($"Raw Block: Hash={rawBlock.hash}, PrevHash={rawBlock.prevHash}, Data={DescribeData(rawBlock.data)}");
-                    BuildLongestChain(rawBlock, state);
-                }
-
-                int deleted = PruneShortForks(state, 3);
-
-                SetNextLinks(state);
-
-                MyBlock<BlockRaw>? currentBlock = state.blockZero;
-                string? prevhash = null;
-
-                MyBlock<BlockRaw>? blockAtHeight119221 = null;
-
-                while (currentBlock != null)
-                {
-                    //Console.WriteLine("height " + currentBlock.height + " " + currentBlock.hash);
-                    if(prevhash != null && prevhash != currentBlock.prevHash)
-                    {
-                        Console.WriteLine("error: prevhash " + prevhash + " does not match currentBlock.prevHash " + currentBlock.prevHash);
-                        throw new Exception("prevhash mismatch");
-                    }
-                    prevhash = currentBlock.hash;
-                    currentBlock = currentBlock.nextLink;
-                    if(currentBlock != null && currentBlock.height == 119221)
-                    {
-                        blockAtHeight119221 = currentBlock;
-                    }
-                }
-
-                MyBlock<BlockRaw>? currBlock = state.blockZero;
-                while (currBlock != null)
-                {
-                    if(currBlock.data.Size > 550)
-                    {
-                        //Console.WriteLine("large blockdata at height " + currBlock.height + " size " + currBlock.data.Size);
-                    }
-                    //Console.WriteLine(currBlock.hash + " -> " + currBlock.prevHash);
-                    currBlock = currBlock.nextLink;
-                }
-
-
-                //get block with height 119221
-
-                Block parsedblockAtHeight119221 = ParseBlock(blockAtHeight119221!.data!, 119221);
-
-                //ReportState(state);
-                foreach(var t in parsedblockAtHeight119221.Transactions)
-                {
-                    // Not Convert.ToHexString(t.Hash) - that prints the bytes in the order they are
-                    // stored, which is this string backwards. GetHashAsString does the reversing.
-                    Console.WriteLine("tx hash: " + t.GetHashAsString());
-                }
-
-                // Walk the longest chain and parse each block's bytes into a SatoshiSharpLib.Block,
-                // so header and Transactions are filled in rather than just the raw bytes sitting
-                // in BlockRaw.Raw. blockZero -> nextLink is chain order, so header.BlockNumber ends
-                // up being the real height.
-                var parseClock = Stopwatch.StartNew();
-                List<Block> parsedChain = new List<Block>();
-
-                long totalTransactions = 0;
-                long totalInputs = 0;
-                long totalOutputs = 0;
-                ulong totalOutputSats = 0;
-                int merkleMismatches = 0;
-
-                List<Transaction> allTransactions = new List<Transaction>();
-
-                MyBlock<BlockRaw>? atBlock = state.blockZero;
-                while (atBlock != null)
-                {
-                    Block parsed = ParseBlock(atBlock.data, atBlock.height);
-                    parsedChain.Add(parsed);
-
-                    foreach (Transaction tx in parsed.Transactions)
-                    {
-                        allTransactions.Add(tx);
-                    }
-
-                    totalTransactions += parsed.Transactions.Count;
-                    foreach (Transaction tx in parsed.Transactions)
-                    {
-                        totalInputs += tx.Inputs.Count;
-                        totalOutputs += tx.Outputs.Count;
-                        foreach (Transaction.TxOutput output in tx.Outputs)
+                        foreach (string file in files)
                         {
-                            totalOutputSats += output.Value;
+                            Console.WriteLine("found blk file: " + file);
+                            SortBlockFileByTimestamp(file);
                         }
                     }
 
-                    // Counted rather than thrown on: one bad block should not take the whole run
-                    // down when 119,000 others are fine.
-                    if (!MerkleRootMatches(parsed))
+
+
+
+
+
+                    if (false)
                     {
-                        merkleMismatches++;
-                        if (merkleMismatches <= 5)
+                        DeleteAllFilesIn("C:\\btcblock\\inOrder\\");
+                    }
+
+
+                    //claude's fake block 33 raw date 01000000e3f6664d5af37062b934f983ed1033e2011b42c9b04735276c7ccbe50000000033c56986d991564d8f2e5d6b3b98105c882a5b108738d0994407de8b72935ac4efc86849ffff001df9649d460101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1d04ffff001d12414c5433332f464f524b2d464958545552450400000000ffffffff0100f2052a01000000434104804d71f6a91c908a973cae7ef4363f7689520116b995d6936328de00be56f92baee0dabf3a240e0ed2dce7f374f12cbba7649808528236cb04c558f028dd61edac00000000
+                    //claude's fake block 33 hash    0000000096a151f27d9cd2d706b6b8e16ba43e7e290bbb77f9eff8fe1d20c66c parent  00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3   ← identical to real block 33 time    1231603951(12s after the real block) nonce   1184720121 bits    1d00ffff(unchanged — difficulty is consensus -fixed in this epoch)
+                    //01234567 123456789012345678901234567890123456789012345678901234567890123 123456789012345678901234567890123456789012345678901234567890123                                                                                                                            01234567890123456789012345678901234567890123
+                    string fakeBlock33 = "{\"data\":{\"33\":{\"raw_block\":\"01000000e3f6664d5af37062b934f983ed1033e2011b42c9b04735276c7ccbe50000000033c56986d991564d8f2e5d6b3b98105c882a5b108738d0994407de8b72935ac4efc86849ffff001df9649d460101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1d04ffff001d12414c5433332f464f524b2d464958545552450400000000ffffffff0100f2052a01000000434104804d71f6a91c908a973cae7ef4363f7689520116b995d6936328de00be56f92baee0dabf3a240e0ed2dce7f374f12cbba7649808528236cb04c558f028dd61edac00000000\",\"decoded_raw_block\":{\"hash\":\"0000000096a151f27d9cd2d706b6b8e16ba43e7e290bbb77f9eff8fe1d20c66c\",\"confirmations\":-1,\"height\":33,\"version\":1,\"versionHex\":\"00000001\",\"merkleroot\":\"c45a93728bde074499d03887105b2a885c10983b6b5d2e8f4d5691d98669c533\",\"time\":1231603951,\"mediantime\":1231601457,\"nonce\":1184720121,\"bits\":\"1d00ffff\",\"difficulty\":1,\"chainwork\":\"0000000000000000000000000000000000000000000000000000002200220022\",\"previousblockhash\":\"00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3\",\"strippedsize\":237,\"size\":237,\"weight\":948,\"nTx\":1,\"tx\":[\"c45a93728bde074499d03887105b2a885c10983b6b5d2e8f4d5691d98669c533\"]}}},\"context\":{\"code\":200,\"source\":\"SYNTHETIC\",\"results\":1,\"state\":960939,\"market_price_usd\":63703,\"cache\":{\"live\":false,\"duration\":120,\"since\":\"2026-08-04 03:37:36\",\"until\":\"2026-08-04 03:39:36\",\"time\":null},\"api\":{\"version\":\"2.0.95-ie\",\"last_major_update\":\"2022-11-07 02:00:00\",\"next_major_update\":\"2023-11-12 02:00:00\",\"documentation\":\"https://blockchair.com/api/docs\",\"notice\":\"SYNTHETIC FIXTURE - not a historical block and not served by any explorer. Locally mined competitor to block 33 for fork / stale-tip detection testing.\"},\"servers\":\"SYNTHETIC\",\"time\":0.006392955780029297,\"render_time\":0.0043070316314697266,\"full_time\":0.010699987411499023,\"request_cost\":1}}";
+                    string jsonBlock33 = "{\"data\":{\"33\":{\"raw_block\":\"01000000e3f6664d5af37062b934f983ed1033e2011b42c9b04735276c7ccbe5000000001012aaab3e3bffd34055aaa157bf78792d5c18f085635eda7046d89c08a0eabde3c86849ffff001d228c22400101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0138ffffffff0100f2052a01000000434104804d71f6a91c908a973cae7ef4363f7689520116b995d6936328de00be56f92baee0dabf3a240e0ed2dce7f374f12cbba7649808528236cb04c558f028dd61edac00000000\",\"decoded_raw_block\":{\"hash\":\"00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962\",\"confirmations\":960926,\"height\":33,\"version\":1,\"versionHex\":\"00000001\",\"merkleroot\":\"bdeaa0089cd84670da5e6385f0185c2d7978bf57a1aa5540d3ff3b3eabaa1210\",\"time\":1231603939,\"mediantime\":1231601457,\"nonce\":1076005922,\"bits\":\"1d00ffff\",\"difficulty\":1,\"chainwork\":\"0000000000000000000000000000000000000000000000000000002200220022\",\"nTx\":1,\"previousblockhash\":\"00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3\",\"nextblockhash\":\"00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f\",\"strippedsize\":215,\"size\":215,\"weight\":860,\"tx\":[\"bdeaa0089cd84670da5e6385f0185c2d7978bf57a1aa5540d3ff3b3eabaa1210\"]}}},\"context\":{\"code\":200,\"source\":\"T+R\",\"results\":1,\"state\":960939,\"market_price_usd\":63703,\"cache\":{\"live\":true,\"duration\":120,\"since\":\"2026-08-04 03:37:36\",\"until\":\"2026-08-04 03:39:36\",\"time\":null},\"api\":{\"version\":\"2.0.95-ie\",\"last_major_update\":\"2022-11-07 02:00:00\",\"next_major_update\":\"2023-11-12 02:00:00\",\"documentation\":\"https:\\/\\/blockchair.com\\/api\\/docs\",\"notice\":\"Try out our new API v.3: https:\\/\\/3xpl.com\\/data\"},\"servers\":\"API4,BTC5,BTC5,BTC5\",\"time\":0.006392955780029297,\"render_time\":0.0043070316314697266,\"full_time\":0.010699987411499023,\"request_cost\":1}}";
+                    // https://api.blockchair.com/bitcoin/raw/block/33
+                    List<BlockRaw> missingBlock33 = ReadBlocksFromJson(jsonBlock33);
+
+                    string jsonBlock32 = "{\"data\":{\"32\":{\"raw_block\":\"01000000c4d369b723c2cf9be33cf00deb1dbfea0c8ccd12c415f29434ff009700000000c9c0fd0ae7b7973c42fc9e3dddc967b6e309570b720ff15414c08365f005992be3c56849ffff001d08e1c00d0101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0136ffffffff0100f2052a01000000434104b949980bb46aee11510519b4af0dfcc3cc7464b3ede15f184b7c8126a98bf6d6e698eaf16b938814174a002ba24daa03e59a7c0927248517b581c09ec70f216eac00000000\",\"decoded_raw_block\":{\"hash\":\"00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3\",\"confirmations\":961020,\"height\":32,\"version\":1,\"versionHex\":\"00000001\",\"merkleroot\":\"2b9905f06583c01454f10f720b5709e3b667c9dd3d9efc423c97b7e70afdc0c9\",\"time\":1231603171,\"mediantime\":1231570573,\"nonce\":230744328,\"bits\":\"1d00ffff\",\"difficulty\":1,\"chainwork\":\"0000000000000000000000000000000000000000000000000000002100210021\",\"nTx\":1,\"previousblockhash\":\"000000009700ff3494f215c412cd8c0ceabf1deb0df03ce39bcfc223b769d3c4\",\"nextblockhash\":\"00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962\",\"strippedsize\":215,\"size\":215,\"weight\":860,\"tx\":[\"2b9905f06583c01454f10f720b5709e3b667c9dd3d9efc423c97b7e70afdc0c9\"]}}},\"context\":{\"code\":200,\"source\":\"T+R\",\"results\":1,\"state\":961051,\"market_price_usd\":64049,\"cache\":{\"live\":true,\"duration\":120,\"since\":\"2026-08-04 17:57:58\",\"until\":\"2026-08-04 17:59:58\",\"time\":null},\"api\":{\"version\":\"2.0.95-ie\",\"last_major_update\":\"2022-11-07 02:00:00\",\"next_major_update\":\"2023-11-12 02:00:00\",\"documentation\":\"https:\\/\\/blockchair.com\\/api\\/docs\",\"notice\":\"Try out our new API v.3: https:\\/\\/3xpl.com\\/data\"},\"servers\":\"API4,BTC5,BTC5,BTC5\",\"time\":0.01161813735961914,\"render_time\":0.0032088756561279297,\"full_time\":0.01482701301574707,\"request_cost\":1}}";
+                    List<BlockRaw> missingBlock32 = ReadBlocksFromJson(jsonBlock32);
+
+                    string jsonBlock34 = "{\"data\":{\"34\":{\"raw_block\":\"01000000627985c0fc1a71e052a5af9420c9b99845432ae099f27a3dea7370a80000000074549b3151d6dd4ce77419d01710921b3211ed3280bf2e3af2c1f1a820063b2272ca6849ffff001d2243c0240101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0147ffffffff0100f2052a01000000434104180bfa57bff462c7641fa0b91efe29344a77086b073cd9c5f769cb2393acc151a4e7377eaabacc39f5b2bd2cd4bcb5ed1855939619e491c79c0bb5793d4edbf3ac00000000\",\"decoded_raw_block\":{\"hash\":\"00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f\",\"confirmations\":961018,\"height\":34,\"version\":1,\"versionHex\":\"00000001\",\"merkleroot\":\"223b0620a8f1c1f23a2ebf8032ed11321b921017d01974e74cddd651319b5474\",\"time\":1231604338,\"mediantime\":1231601503,\"nonce\":616579874,\"bits\":\"1d00ffff\",\"difficulty\":1,\"chainwork\":\"0000000000000000000000000000000000000000000000000000002300230023\",\"nTx\":1,\"previousblockhash\":\"00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962\",\"nextblockhash\":\"00000000b572a465b4e816420d47a16274557b3573b7924b64808a82c7322d9b\",\"strippedsize\":215,\"size\":215,\"weight\":860,\"tx\":[\"223b0620a8f1c1f23a2ebf8032ed11321b921017d01974e74cddd651319b5474\"]}}},\"context\":{\"code\":200,\"source\":\"T+R\",\"results\":1,\"state\":961051,\"market_price_usd\":64049,\"cache\":{\"live\":true,\"duration\":120,\"since\":\"2026-08-04 17:59:02\",\"until\":\"2026-08-04 18:01:02\",\"time\":null},\"api\":{\"version\":\"2.0.95-ie\",\"last_major_update\":\"2022-11-07 02:00:00\",\"next_major_update\":\"2023-11-12 02:00:00\",\"documentation\":\"https:\\/\\/blockchair.com\\/api\\/docs\",\"notice\":\"Try out our new API v.3: https:\\/\\/3xpl.com\\/data\"},\"servers\":\"API4,BTC5,BTC5,BTC5\",\"time\":0.009490013122558594,\"render_time\":0.003835916519165039,\"full_time\":0.013325929641723633,\"request_cost\":1}}";
+                    List<BlockRaw> missingBlock34 = ReadBlocksFromJson(jsonBlock34);
+
+                    List<BlockRaw> missingBlocks = new List<BlockRaw>();
+                    missingBlocks.AddRange(missingBlock32);
+                    missingBlocks.AddRange(missingBlock33);
+                    missingBlocks.AddRange(missingBlock34);
+
+                    // 30 00000000bc919cfb64f62de736d55cf79e3d535b474ace256b4fbb56073f64db
+                    // 31 000000009700ff3494f215c412cd8c0ceabf1deb0df03ce39bcfc223b769d3c4
+                    // 32 00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3
+                    // 33 00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962
+                    // 34 00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f
+
+                    foreach (var f in missingBlocks)
+                    {
+                        Console.WriteLine("0" + "***  " + f.GetUnixTime() + " " + f.GetPrevBlockHash().Substring(30) + " hash " + f.DisplayHash.Substring(30));
+
+                    }
+
+
+                    int currentIndex = 0;
+                    string prevHash = "";
+                    while (currentIndex < 111)
+                    {
+
+                        foundByIndex = FindBlockByPosition(@"C:\btcblock\claudeblocks", 0, currentIndex, out scannedByIndex);
+                        if (foundByIndex!.DisplayHash == "00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3" ||
+                            foundByIndex!.DisplayHash == "00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962" ||
+                            foundByIndex!.DisplayHash == "00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f")
                         {
-                            Console.WriteLine("merkle mismatch at height " + parsed.header.BlockNumber
-                                              + " " + parsed.header.Hash);
+                            Console.WriteLine(currentIndex + "***  " + foundByIndex.GetUnixTime() + " " + foundByIndex.GetPrevBlockHash().Substring(30) + " hash " + foundByIndex.DisplayHash.Substring(30));
+                            if (missingBlock32.First()! == foundByIndex!)
+                            {
+                                Console.WriteLine("match block 32");
+
+                            }
+                        }
+                        else
+                        {
+                            if (prevHash != foundByIndex.GetPrevBlockHash())
+                            {
+                                Console.WriteLine(currentIndex + "     " + foundByIndex.GetUnixTime() + " " + foundByIndex.GetPrevBlockHash().Substring(30) + " hash " + foundByIndex.DisplayHash.Substring(30));
+                            }
+
+
+                        }
+                        prevHash = foundByIndex.DisplayHash;
+                        currentIndex++;
+
+                    }
+
+
+
+
+                    if (true)
+                    {
+                        // assumes blocks in order
+
+                        int currentIndex2 = 0;
+                        BlockRaw prevFoundByIndex3 = null;
+                        while (currentIndex2 < 10)
+                        {
+
+                            foundByIndex = FindBlockByPosition("C:\\btcblock\\claudeblocks", 0, currentIndex2, out scannedByIndex);
+                            if (foundByIndex == null) break;      // file holds fewer blocks than this
+
+
+                            string h = foundByIndex.GetPrevBlockHash().Substring(40);
+                            Console.WriteLine(currentIndex2 + "     " + h + " " + foundByIndex.DisplayHash.Substring(40));
+
+                            currentIndex2++;
                         }
                     }
 
-                    atBlock = atBlock.nextLink;
-                }
-                parseClock.Stop();
 
 
 
-                Console.WriteLine("parsed " + parsedChain.Count + " blocks in "
-                                  + parseClock.Elapsed.TotalSeconds.ToString("F1") + "s");
-                Console.WriteLine("  transactions : " + totalTransactions);
-                Console.WriteLine("  inputs       : " + totalInputs);
-                Console.WriteLine("  outputs      : " + totalOutputs);
-                Console.WriteLine("  output value : " + (totalOutputSats / 100000000.0).ToString("F8") + " BTC");
-                Console.WriteLine("  merkle roots : " + (parsedChain.Count - merkleMismatches)
-                                  + " of " + parsedChain.Count + " match");
 
 
-                // Two things this has to get right. The hex is in display order, so it needs
-                // reversing to match t.Hash, which is stored little-endian. And byte[] has to be
-                // compared element by element - `==` on arrays is reference equality, so comparing
-                // two different arrays that hold identical bytes is always false.
-                byte[] myhash = Convert.FromHexString("382f663b0554c5986b295eec475166592c3c638e61afe7d7a2ea2100935ba3a6");
-                Array.Reverse(myhash);
 
-                foreach (var t in allTransactions)
-                {
-                    if (t.Hash.AsSpan().SequenceEqual(myhash))
+
+
+                    Console.WriteLine("Longest Chain Harness");
+
+                    List<MyRawBlock<BlockRaw>> rawBlocks = new List<MyRawBlock<BlockRaw>>();
+
+                    // One pass over the file for all of them. Asking FindBlockByPosition for block 0,
+                    // then block 1, and so on re-walks the file from the start every time, which is
+                    // where the harness was spending its time - and it cannot run off the end here,
+                    // since the file itself says how many blocks there are.
+                    var readClock = Stopwatch.StartNew();
+
+                    List<BlockRaw> allBlocks = new List<BlockRaw>();
+                    int blkFile = 0;
+                    while(blkFile < 8)
                     {
-                        Console.WriteLine("found transaction " + t.GetHashAsString());
-                        Console.WriteLine("  inputs: " + t.Inputs.Count);
-                        foreach (var input in t.Inputs)
+                        List<BlockRaw> blocksInFile = ReadAllBlocks(@"C:\btcblock\claudeblocks", blkFile);
+                        allBlocks.AddRange(blocksInFile);
+                        blkFile++;
+                    }
+                    //List<BlockRaw> allBlocksOneFile = ReadAllBlocks(@"C:\btcblock\claudeblocks", 0); // only blk00000.dat
+
+
+
+
+                    Console.WriteLine("blk00000.dat holds " + allBlocks.Count + " blocks, read in "
+                                      + readClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+
+                    foreach (BlockRaw block in allBlocks)
+                    {
+                        rawBlocks.Add(new MyRawBlock<BlockRaw>
                         {
-                            //Console.WriteLine("    input prev tx: " + input.PrevTxHash + " index: " + input.PrevTxIndex);
+                            hash = block.DisplayHash.Substring(40),
+                            prevHash = block.GetPrevBlockHash().Substring(40),
+                            data = block
+                        });
+                    }
+
+                    ChainState<BlockRaw> state = new ChainState<BlockRaw>();
+
+                    foreach (var rawBlock in rawBlocks)
+                    {
+                        //Console.WriteLine($"Raw Block: Hash={rawBlock.hash}, PrevHash={rawBlock.prevHash}, Data={DescribeData(rawBlock.data)}");
+                        BuildLongestChain(rawBlock, state);
+                    }
+
+                    int deleted = PruneShortForks(state, 3);
+
+                    SetNextLinks(state);
+
+                    MyBlock<BlockRaw>? currentBlock = state.blockZero;
+                    string? prevhash = null;
+
+                    MyBlock<BlockRaw>? blockAtHeight119221 = null;
+
+                    while (currentBlock != null)
+                    {
+                        //Console.WriteLine("height " + currentBlock.height + " " + currentBlock.hash);
+                        if (prevhash != null && prevhash != currentBlock.prevHash)
+                        {
+                            Console.WriteLine("error: prevhash " + prevhash + " does not match currentBlock.prevHash " + currentBlock.prevHash);
+                            throw new Exception("prevhash mismatch");
                         }
-                        Console.WriteLine("  outputs: " + t.Outputs.Count);
-                        foreach (var output in t.Outputs)
+                        prevhash = currentBlock.hash;
+                        currentBlock = currentBlock.nextLink;
+                        if (currentBlock != null && currentBlock.height == 119221)
                         {
-                            Console.WriteLine("    output value: " + output.Value + " script: " + Convert.ToHexString(output.ScriptPubKey).ToLowerInvariant());
+                            blockAtHeight119221 = currentBlock;
                         }
                     }
+
+                    MyBlock<BlockRaw>? currBlock = state.blockZero;
+                    while (currBlock != null)
+                    {
+                        if (currBlock.data.Size > 550)
+                        {
+                            //Console.WriteLine("large blockdata at height " + currBlock.height + " size " + currBlock.data.Size);
+                        }
+                        //Console.WriteLine(currBlock.hash + " -> " + currBlock.prevHash);
+                        currBlock = currBlock.nextLink;
+                    }
+
+
+                    //get block with height 119221
+
+                    Block parsedblockAtHeight119221 = ParseBlock(blockAtHeight119221!.data!, 119221);
+
+                    //ReportState(state);
+                    foreach (var t in parsedblockAtHeight119221.Transactions)
+                    {
+                        // Not Convert.ToHexString(t.Hash) - that prints the bytes in the order they are
+                        // stored, which is this string backwards. GetHashAsString does the reversing.
+                        Console.WriteLine("tx hash: " + t.GetHashAsString());
+                    }
+
+                    // Walk the longest chain and parse each block's bytes into a SatoshiSharpLib.Block,
+                    // so header and Transactions are filled in rather than just the raw bytes sitting
+                    // in BlockRaw.Raw. blockZero -> nextLink is chain order, so header.BlockNumber ends
+                    // up being the real height.
+                    var parseClock = Stopwatch.StartNew();
+                    List<Block> parsedChain = new List<Block>();
+
+                    long totalTransactions = 0;
+                    long totalInputs = 0;
+                    long totalOutputs = 0;
+                    ulong totalOutputSats = 0;
+                    int merkleMismatches = 0;
+
+                    List<Transaction> allTransactions = new List<Transaction>();
+
+                    MyBlock<BlockRaw>? atBlock = state.blockZero;
+                    int count = 0;
+                    while (atBlock != null)
+                    {
+                        Block parsed = ParseBlock(atBlock.data, atBlock.height);
+                        parsedChain.Add(parsed);
+
+                        foreach (Transaction tx in parsed.Transactions)
+                        {
+                            allTransactions.Add(tx);
+                        }
+
+                        totalTransactions += parsed.Transactions.Count;
+                        foreach (Transaction tx in parsed.Transactions)
+                        {
+                            totalInputs += tx.Inputs.Count;
+                            totalOutputs += tx.Outputs.Count;
+                            foreach (Transaction.TxOutput output in tx.Outputs)
+                            {
+                                totalOutputSats += output.Value;
+                            }
+                        }
+
+                        // Counted rather than thrown on: one bad block should not take the whole run
+                        // down when 119,000 others are fine.
+                        if (!MerkleRootMatches(parsed))
+                        {
+                            merkleMismatches++;
+                            if (merkleMismatches <= 5)
+                            {
+                                Console.WriteLine("merkle mismatch at height " + parsed.header.BlockNumber
+                                                  + " " + parsed.header.Hash);
+                            }
+                        }
+
+                        atBlock = atBlock.nextLink;
+                        if (count++ % 20000 == 0)
+                        {
+                            Console.WriteLine(count + " parsed height " + parsed.header.BlockNumber + " " + parsed.header.Hash);
+                        }
+                    }
+                    parseClock.Stop();
+
+
+
+                    Console.WriteLine("parsed " + parsedChain.Count + " blocks in "
+                                      + parseClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+                    Console.WriteLine("  transactions : " + totalTransactions);
+                    Console.WriteLine("  inputs       : " + totalInputs);
+                    Console.WriteLine("  outputs      : " + totalOutputs);
+                    Console.WriteLine("  output value : " + (totalOutputSats / 100000000.0).ToString("F8") + " BTC");
+                    Console.WriteLine("  merkle roots : " + (parsedChain.Count - merkleMismatches)
+                                      + " of " + parsedChain.Count + " match");
+
+                    if (true)  
+                    {
+                        // 119221 block 2nd transaction 382f663b0554c5986b295eec475166592c3c638e61afe7d7a2ea2100935ba3a6  
+                        byte[] myhash = Convert.FromHexString("382f663b0554c5986b295eec475166592c3c638e61afe7d7a2ea2100935ba3a6");
+                        Array.Reverse(myhash);
+
+                        foreach (var t in allTransactions)
+                        {
+                            if (t.Hash.AsSpan().SequenceEqual(myhash))
+                            {
+                                Console.WriteLine("found transaction " + t.GetHashAsString());
+                                Console.WriteLine("  inputs: " + t.Inputs.Count);
+                                foreach (var input in t.Inputs)
+                                {
+                                    //Console.WriteLine("    input prev tx: " + input.PrevTxHash + " index: " + input.PrevTxIndex);
+                                }
+                                Console.WriteLine("  outputs: " + t.Outputs.Count);
+                                foreach (var output in t.Outputs)
+                                {
+                                    Console.WriteLine("    output value: " + output.Value + " script: " + Convert.ToHexString(output.ScriptPubKey).ToLowerInvariant());
+                                }
+                            }
+                        }
+                    }
+
+                    if (true)
+                    {
+                        // 159920 block 2nd transaction c22f79ba86968a5285225008b2740f074f44f44ef27b8efb61ecff09e9eb4f6d  
+                        byte[] myhash = Convert.FromHexString("c22f79ba86968a5285225008b2740f074f44f44ef27b8efb61ecff09e9eb4f6d");
+                        Array.Reverse(myhash);
+
+                        foreach (var t in allTransactions)
+                        {
+                            if (t.Hash.AsSpan().SequenceEqual(myhash))
+                            {
+                                Console.WriteLine("found transaction " + t.GetHashAsString());
+                                Console.WriteLine("  inputs: " + t.Inputs.Count);
+                                foreach (var input in t.Inputs)
+                                {
+                                    //Console.WriteLine("    input prev tx: " + input.PrevTxHash + " index: " + input.PrevTxIndex);
+                                }
+                                Console.WriteLine("  outputs: " + t.Outputs.Count);
+                                foreach (var output in t.Outputs)
+                                {
+                                    Console.WriteLine("    output value: " + output.Value + " script: " + Convert.ToHexString(output.ScriptPubKey).ToLowerInvariant());
+                                }
+                            }
+                        }
+                    }
+
+                    
+
+                    Console.WriteLine("total transactions: " + allTransactions.Count);
+
+                    if (false)
+                    {
+                        // Save all blocks to rocksdb. state.blockZero is the root, and the walk follows
+                        // nextLink to the tip, so what lands in the database is the longest chain in
+                        // height order - not the 730 blocks still parked waiting on a parent.
+                        string rocksDbPath = "C:\\btcblock\\rocksdb\\blocks";
+
+                        var rocksClock = Stopwatch.StartNew();
+                        int savedToRocksDb = SaveBlocksToRocksDb(rocksDbPath, state.blockZero);
+                        rocksClock.Stop();
+
+                        Console.WriteLine("  wrote in   : " + rocksClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+
+                        // Reopen it and pull one block back, to show the store stands on its own.
+                        byte[]? blockOneFromDb = ReadBlockFromRocksDb(rocksDbPath, 1);
+                        if (blockOneFromDb != null)
+                        {
+                            Console.WriteLine("  reopened   : height 1 is "
+                                              + ToDisplayHex(DoubleSha256(blockOneFromDb, 0, 80))
+                                              + " (" + blockOneFromDb.Length + " bytes)");
+                        }
+                    }
+                    
+
+                    return 0;
                 }
-
-                Console.WriteLine("total transactions: " + allTransactions.Count);
-
-                // print transaction with 382f663b0554c5986b295eec475166592c3c638e61afe7d7a2ea2100935ba3a6 here
-
-                /*
-
-
-                //string blockDataDirectory = "C:\\btcblock\\mostblocks11_zeroxor";
-                string blockDataDirectory =           "C:\\btcblock\\claudeblocksRetryLane\\";
-
-
-                BlockRaw? prevFoundByIndex = null;
-                currentIndex = 0;
-                int written = 0;
-
-
-                // Blocks arrive in file order, which is arrival order - a block's parent is usually
-                // somewhere else entirely. The assembler parks whatever does not connect yet,
-                // tracks cumulative work per branch, and only writes a block once it is 50 deep
-                // behind the heaviest tip, at which point a competing branch would need 50 blocks
-                // of its own to take it back.
-                var assembler = new ChainAssembler("C:\\btcblock\\claudeblocksRetryLane\\blk00000.dat",
-                                                   confirmationDepth: 50, maxPending: 1000);
-
-                while (currentIndex < 2600)
+                catch (Exception ex)
                 {
-                    foundByIndex = FindBlockByPosition("C:\\btcblock\\claudeblocksRetryLane", 0, currentIndex, out scannedByIndex);
-                    if (foundByIndex == null) break;      // ran off the end of the file
-
-                    assembler.Add(foundByIndex);
-                    assembler.Flush();                    // commits whatever just became 50 deep
-
-                    currentIndex++;
+                    Console.Error.WriteLine("error: " + ex.Message);
+                    return 1;
                 }
+            }
+            //else for rocksdb
+            if(false)
+            {
+                // load rocksdb
+                //
+                // The branch above earns this one: it walked the blk files, worked out which
+                // blocks form the longest chain and in what order, and wrote that out. So there is
+                // no scanning, no chain to rebuild and nothing to sort here - the blocks come back
+                // in height order because that is how they were filed.
+                string rocksDbPath = "C:\\btcblock\\rocksdb\\blocks";
 
-                // Height 33 was never downloaded, so the chain in the file stops at 32. The pasted
-                // API response holds it - hand it to the assembler the same way a block read off
-                // disk would be, and the parked blocks behind it connect up on their own.
-                //foreach (BlockRaw imported in ReadBlocksFromJson(BlockRaw33))
+                List<BlockRaw> loaded;
+                try
                 {
-                  //  assembler.Add(imported);
+                    var loadClock = Stopwatch.StartNew();
+                    loaded = LoadBlocksFromRocksDb(rocksDbPath);
+                    loadClock.Stop();
+
+                    Console.WriteLine("rocksdb loaded: " + loaded.Count + " blocks from " + rocksDbPath
+                                      + " in " + loadClock.Elapsed.TotalSeconds.ToString("F2") + "s");
                 }
-                //assembler.Flush();
-
-                int writtenWhileStreaming = assembler.Written;
-
-                // Nothing further can arrive to outweigh the tip, so the last 50 are safe to commit.
-                assembler.FlushAll();
-                written = assembler.Written;
-
-                Console.WriteLine("read " + currentIndex + " blocks, wrote " + written
-                                  + " (" + writtenWhileStreaming + " of them " + assembler.ConfirmationDepth
-                                  + "-deep during the scan, "
-                                  + (written - writtenWhileStreaming) + " on the final flush)");
-                Console.WriteLine("  best tip    : height " + assembler.BestTipHeight + " " + assembler.BestTipHash);
-                Console.WriteLine("  duplicates " + assembler.Duplicates + ", still waiting on a parent "
-                                  + assembler.Pending + ", evicted " + assembler.Evicted
-                                  + ", deep reorgs " + assembler.DeepReorgs);
-
-                // The greedy pass above can only keep a block when it happens to sit right after
-                // its parent in the file. This one indexes the whole file by parent hash first and
-                // then follows the links, so it recovers the blocks that pass had to drop. It
-                // writes straight into inOrder2, which the verification loop below reads.
-                ChainOrderResult ordered = WriteChainOrdered(blockDataDirectory, reqBlock3ByIndex.FileIndex,
-                                                             "C:\\btcblock\\inOrder2\\blk00000.dat", "", 1600);
-                Console.WriteLine("reordered " + ordered.BlocksWritten + " of " + ordered.BlocksInFile
-                                  + " blocks, " + ordered.Unreachable + " unreachable, "
-                                  + ordered.ForkedParents + " forked parents");
-                Console.WriteLine("  from " + ordered.StartHash);
-                Console.WriteLine("  to   " + ordered.EndHash);
-
-
-
-                    // block 500 0000000047560030cea942ff993f9c5464dd6499e7118d189c56ca57a465bcb7
-
-                    //int scannedByIndex2=2;
-               // BlockRaw? tqfFoundByIndex = FindBlockByPosition("C:\\btcblock\\inOrder2\\", 0, 500, out scannedByIndex2);
-
-
-
-                BlockRaw? found;
-
-                if (req.ByHash)
+                catch (Exception ex)
                 {
-                    found = FindBlockByHash(blockDataDirectory, req.FileIndex, req.Hash, out scanned);
-                }
-                else
-                {
-                    found = FindBlockByPosition(blockDataDirectory, req.FileIndex, req.BlockIndex, out scanned);
-                }
-
-                if (found == null)
-                {
-                    ReportMiss(req, scanned, blockDataDirectory);
+                    Console.Error.WriteLine("could not load the store: " + ex.Message);
+                    Console.Error.WriteLine("set rocksDbLoaded to false to build it from the blk files first");
                     return 1;
                 }
 
-                PrintSummary(found, scanned);
-
-                //if (req.AppendPath != null)
-                //{
-                  //  long writtenAt = AppendBlockToFile(req.AppendPath, found);
-                    //Console.Error.WriteLine("appended    : " + (found.Size + 8) + " bytes to " + req.AppendPath
-                  //                          + " at offset " + writtenAt);
-                //}
-
-                string hex = Convert.ToHexString(found.Raw).ToLowerInvariant();
-                if (req.OutPath != null)
+                if (loaded.Count == 0)
                 {
-                    File.WriteAllText(req.OutPath, hex);
-                    Console.Error.WriteLine("wrote " + hex.Length + " hex chars to " + req.OutPath);
+                    Console.Error.WriteLine("the store is empty - nothing to work with");
+                    return 1;
+                }
+
+                Console.WriteLine("  first      : height " + loaded[0].BlockIndex + " " + loaded[0].DisplayHash);
+                Console.WriteLine("  last       : height " + loaded[loaded.Count - 1].BlockIndex
+                                  + " " + loaded[loaded.Count - 1].DisplayHash);
+
+                // The blocks were stored in chain order, so this is checking the store kept it -
+                // every block's parent should be the one before it, with no gap in the heights.
+                int brokenLinks = 0;
+                for (int i = 1; i < loaded.Count; i++)
+                {
+                    if (loaded[i].GetPrevBlockHash() != loaded[i - 1].DisplayHash)
+                    {
+                        brokenLinks++;
+                        if (brokenLinks <= 5)
+                        {
+                            Console.Error.WriteLine("  break at height " + loaded[i].BlockIndex
+                                                    + ": parent is " + loaded[i].GetPrevBlockHash()
+                                                    + ", previous block is " + loaded[i - 1].DisplayHash);
+                        }
+                    }
+                }
+
+                if (brokenLinks == 0)
+                {
+                    Console.WriteLine("  chain      : all " + (loaded.Count - 1) + " links hold");
                 }
                 else
                 {
-                    Console.Out.WriteLine(hex);
-                }*/
-                return 0;
+                    Console.WriteLine("  chain      : " + brokenLinks + " broken links");
+                }
+
+                // Parse them, the same way the blk-file branch does.
+                var parseFromDbClock = Stopwatch.StartNew();
+                long loadedTransactions = 0;
+                long loadedInputs = 0;
+                long loadedOutputs = 0;
+                ulong loadedOutputSats = 0;
+                int loadedMerkleMismatches = 0;
+
+                foreach (BlockRaw raw in loaded)
+                {
+                    Block parsedFromDb = ParseBlock(raw, raw.BlockIndex);
+
+                    loadedTransactions += parsedFromDb.Transactions.Count;
+                    foreach (Transaction tx in parsedFromDb.Transactions)
+                    {
+                        loadedInputs += tx.Inputs.Count;
+                        loadedOutputs += tx.Outputs.Count;
+                        foreach (Transaction.TxOutput output in tx.Outputs)
+                        {
+                            loadedOutputSats += output.Value;
+                        }
+                    }
+
+                    if (!MerkleRootMatches(parsedFromDb))
+                    {
+                        loadedMerkleMismatches++;
+                    }
+                }
+                parseFromDbClock.Stop();
+
+                Console.WriteLine("  parsed in  : " + parseFromDbClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+                Console.WriteLine("  transactions: " + loadedTransactions);
+                Console.WriteLine("  inputs      : " + loadedInputs + ", outputs " + loadedOutputs);
+                Console.WriteLine("  output value: " + (loadedOutputSats / 100000000.0).ToString("F8") + " BTC");
+                Console.WriteLine("  merkle roots: " + (loaded.Count - loadedMerkleMismatches)
+                                  + " of " + loaded.Count + " match");
             }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine("error: " + ex.Message);
-                return 1;
-            }
+            return 0;
         }
+
+        //junk
+
+        /*
+
+
+        //string blockDataDirectory = "C:\\btcblock\\mostblocks11_zeroxor";
+        string blockDataDirectory =           "C:\\btcblock\\claudeblocksRetryLane\\";
+
+
+        BlockRaw? prevFoundByIndex = null;
+        currentIndex = 0;
+        int written = 0;
+
+
+        // Blocks arrive in file order, which is arrival order - a block's parent is usually
+        // somewhere else entirely. The assembler parks whatever does not connect yet,
+        // tracks cumulative work per branch, and only writes a block once it is 50 deep
+        // behind the heaviest tip, at which point a competing branch would need 50 blocks
+        // of its own to take it back.
+        var assembler = new ChainAssembler("C:\\btcblock\\claudeblocksRetryLane\\blk00000.dat",
+                                           confirmationDepth: 50, maxPending: 1000);
+
+        while (currentIndex < 2600)
+        {
+            foundByIndex = FindBlockByPosition("C:\\btcblock\\claudeblocksRetryLane", 0, currentIndex, out scannedByIndex);
+            if (foundByIndex == null) break;      // ran off the end of the file
+
+            assembler.Add(foundByIndex);
+            assembler.Flush();                    // commits whatever just became 50 deep
+
+            currentIndex++;
+        }
+
+        // Height 33 was never downloaded, so the chain in the file stops at 32. The pasted
+        // API response holds it - hand it to the assembler the same way a block read off
+        // disk would be, and the parked blocks behind it connect up on their own.
+        //foreach (BlockRaw imported in ReadBlocksFromJson(BlockRaw33))
+        {
+          //  assembler.Add(imported);
+        }
+        //assembler.Flush();
+
+        int writtenWhileStreaming = assembler.Written;
+
+        // Nothing further can arrive to outweigh the tip, so the last 50 are safe to commit.
+        assembler.FlushAll();
+        written = assembler.Written;
+
+        Console.WriteLine("read " + currentIndex + " blocks, wrote " + written
+                          + " (" + writtenWhileStreaming + " of them " + assembler.ConfirmationDepth
+                          + "-deep during the scan, "
+                          + (written - writtenWhileStreaming) + " on the final flush)");
+        Console.WriteLine("  best tip    : height " + assembler.BestTipHeight + " " + assembler.BestTipHash);
+        Console.WriteLine("  duplicates " + assembler.Duplicates + ", still waiting on a parent "
+                          + assembler.Pending + ", evicted " + assembler.Evicted
+                          + ", deep reorgs " + assembler.DeepReorgs);
+
+        // The greedy pass above can only keep a block when it happens to sit right after
+        // its parent in the file. This one indexes the whole file by parent hash first and
+        // then follows the links, so it recovers the blocks that pass had to drop. It
+        // writes straight into inOrder2, which the verification loop below reads.
+        ChainOrderResult ordered = WriteChainOrdered(blockDataDirectory, reqBlock3ByIndex.FileIndex,
+                                                     "C:\\btcblock\\inOrder2\\blk00000.dat", "", 1600);
+        Console.WriteLine("reordered " + ordered.BlocksWritten + " of " + ordered.BlocksInFile
+                          + " blocks, " + ordered.Unreachable + " unreachable, "
+                          + ordered.ForkedParents + " forked parents");
+        Console.WriteLine("  from " + ordered.StartHash);
+        Console.WriteLine("  to   " + ordered.EndHash);
+
+
+
+            // block 500 0000000047560030cea942ff993f9c5464dd6499e7118d189c56ca57a465bcb7
+
+            //int scannedByIndex2=2;
+       // BlockRaw? tqfFoundByIndex = FindBlockByPosition("C:\\btcblock\\inOrder2\\", 0, 500, out scannedByIndex2);
+
+
+
+        BlockRaw? found;
+
+        if (req.ByHash)
+        {
+            found = FindBlockByHash(blockDataDirectory, req.FileIndex, req.Hash, out scanned);
+        }
+        else
+        {
+            found = FindBlockByPosition(blockDataDirectory, req.FileIndex, req.BlockIndex, out scanned);
+        }
+
+        if (found == null)
+        {
+            ReportMiss(req, scanned, blockDataDirectory);
+            return 1;
+        }
+
+        PrintSummary(found, scanned);
+
+        //if (req.AppendPath != null)
+        //{
+          //  long writtenAt = AppendBlockToFile(req.AppendPath, found);
+            //Console.Error.WriteLine("appended    : " + (found.Size + 8) + " bytes to " + req.AppendPath
+          //                          + " at offset " + writtenAt);
+        //}
+
+        string hex = Convert.ToHexString(found.Raw).ToLowerInvariant();
+        if (req.OutPath != null)
+        {
+            File.WriteAllText(req.OutPath, hex);
+            Console.Error.WriteLine("wrote " + hex.Length + " hex chars to " + req.OutPath);
+        }
+        else
+        {
+            Console.Out.WriteLine(hex);
+        }*/
+
 
         /// <summary>
         /// Returns false when the caller should just print usage and stop (--help, or nothing to
@@ -2258,6 +2434,269 @@ Examples:
             return string.Equals(Helpers.GetStringReverseHexBytes(computed),
                                  block.header.GetMerkleRootAsString(),
                                  StringComparison.OrdinalIgnoreCase);
+        }
+
+        // ------------------------------------------------------------------------------------
+        // RocksDB block store
+        // ------------------------------------------------------------------------------------
+
+        // Key layout. Every key carries a one byte prefix so the different kinds share one
+        // keyspace without colliding, which is the same shape Bitcoin Core's block index uses.
+        //
+        //   'b' + hash[32]     -> the serialized block
+        //   'h' + height[4]    -> the hash of the block at that height
+        //   'T'                -> the hash of the tip
+        //   'M'                -> count[4] and tip height[4]
+        //
+        // Hashes are stored in internal (little endian) order, matching Transaction.Hash and
+        // TxInput.TxId rather than the reversed form explorers show.
+        const byte BlockPrefix = (byte)'b';
+        const byte HeightPrefix = (byte)'h';
+
+        static readonly byte[] TipKey = { (byte)'T' };
+        static readonly byte[] MetaKey = { (byte)'M' };
+
+        /// <summary>Blocks per write batch - a batch is held in memory until it is written.</summary>
+        const int BlocksPerBatch = 2000;
+
+        static byte[] BlockKey(byte[] internalHash)
+        {
+            byte[] key = new byte[33];
+            key[0] = BlockPrefix;
+            internalHash.CopyTo(key, 1);
+            return key;
+        }
+
+        /// <summary>
+        /// Height keys are BIG endian on purpose. RocksDB orders keys by their bytes, so a big
+        /// endian height means iterating the 'h' keys walks the chain from genesis upwards -
+        /// little endian would interleave heights 1, 256, 512 and so on.
+        /// </summary>
+        static byte[] HeightKey(int height)
+        {
+            byte[] key = new byte[5];
+            key[0] = HeightPrefix;
+            BinaryPrimitives.WriteInt32BigEndian(key.AsSpan(1, 4), height);
+            return key;
+        }
+
+        /// <summary>The block's hash as the 32 bytes it is stored as, not the display string.</summary>
+        static byte[] InternalHashBytes(BlockRaw raw)
+        {
+            return ReverseCopy(Convert.FromHexString(raw.DisplayHash));
+        }
+
+        /// <summary>
+        /// Writes every block on a chain into a RocksDB database, keyed by hash with a height
+        /// index beside it, and reads a sample back to check the round trip. Creates the database
+        /// when it is not there; re-running overwrites the same keys rather than duplicating them,
+        /// so it is safe to run twice.
+        ///
+        /// Pass the root of the chain - ChainState.blockZero - and it follows nextLink to the tip.
+        ///
+        /// Returns how many blocks were written.
+        /// </summary>
+        public static int SaveBlocksToRocksDb(string dbPath, MyBlock<BlockRaw>? chainStart, int verifyEvery = 5000)
+        {
+            Directory.CreateDirectory(dbPath);
+
+            var options = new DbOptions().SetCreateIfMissing(true);
+
+            int written = 0;
+            int verified = 0;
+            int roundTripFailures = 0;
+            int tipHeight = -1;
+            byte[] tipHash = Array.Empty<byte>();
+
+            using (RocksDb db = RocksDb.Open(options, dbPath))
+            {
+                var batch = new WriteBatch();
+                int inBatch = 0;
+
+                MyBlock<BlockRaw>? at = chainStart;
+                while (at != null)
+                {
+                    byte[] hash = InternalHashBytes(at.data);
+
+                    batch.Put(BlockKey(hash), at.data.Raw);
+                    batch.Put(HeightKey(at.height), hash);
+
+                    tipHash = hash;
+                    tipHeight = at.height;
+                    written++;
+                    inBatch++;
+
+                    // Whole chain in one batch would be the entire file plus overhead sitting in
+                    // memory before a single byte reached disk.
+                    if (inBatch >= BlocksPerBatch)
+                    {
+                        db.Write(batch);
+                        batch.Dispose();
+                        batch = new WriteBatch();
+                        inBatch = 0;
+                    }
+
+                    at = at.nextLink;
+                }
+
+                if (inBatch > 0)
+                {
+                    db.Write(batch);
+                }
+                batch.Dispose();
+
+                if (written > 0)
+                {
+                    byte[] meta = new byte[8];
+                    BinaryPrimitives.WriteInt32LittleEndian(meta.AsSpan(0, 4), written);
+                    BinaryPrimitives.WriteInt32LittleEndian(meta.AsSpan(4, 4), tipHeight);
+
+                    db.Put(TipKey, tipHash);
+                    db.Put(MetaKey, meta);
+                }
+
+                // Read a sample back while the database is still open. Bytes in equals bytes out,
+                // and the height index has to lead to the same block the hash key does.
+                if (verifyEvery > 0)
+                {
+                    MyBlock<BlockRaw>? check = chainStart;
+                    while (check != null)
+                    {
+                        if (check.height % verifyEvery == 0)
+                        {
+                            verified++;
+
+                            byte[]? hashAtHeight = db.Get(HeightKey(check.height));
+                            byte[] expectedHash = InternalHashBytes(check.data);
+
+                            bool good = hashAtHeight != null
+                                        && hashAtHeight.AsSpan().SequenceEqual(expectedHash);
+                            if (good)
+                            {
+                                byte[]? stored = db.Get(BlockKey(hashAtHeight!));
+                                good = stored != null && stored.AsSpan().SequenceEqual(check.data.Raw);
+                            }
+
+                            if (!good)
+                            {
+                                roundTripFailures++;
+                                Console.Error.WriteLine("rocksdb round trip failed at height " + check.height);
+                            }
+                        }
+                        check = check.nextLink;
+                    }
+                }
+            }
+
+            Console.WriteLine("rocksdb      : " + written + " blocks written to " + dbPath);
+            Console.WriteLine("  tip        : height " + tipHeight + " " + ToDisplayHex(tipHash));
+            Console.WriteLine("  round trip : " + (verified - roundTripFailures) + " of " + verified + " sampled blocks match");
+
+            return written;
+        }
+
+        /// <summary>
+        /// Reads every block back out of the store, in height order, as the same BlockRaw objects
+        /// ReadAllBlocks hands back - so anything that works on blocks read from a blk file works
+        /// on these unchanged.
+        ///
+        /// The height index is walked with an iterator rather than by asking for height 0, then 1,
+        /// and so on: keys come back in order for free, and a gap in the heights is skipped rather
+        /// than ending the walk. Offset is -1 on these, since a row in a database has no offset in
+        /// a file, and BlockIndex holds the height.
+        ///
+        /// Every block is re-hashed and checked against the hash it is filed under. A block whose
+        /// bytes rotted on disk would otherwise be handed back wearing the hash it used to have.
+        /// </summary>
+        public static List<BlockRaw> LoadBlocksFromRocksDb(string dbPath)
+        {
+            if (!Directory.Exists(dbPath))
+            {
+                throw new DirectoryNotFoundException("no rocksdb store at " + dbPath
+                                                     + " - nothing has been saved there yet");
+            }
+
+            var blocks = new List<BlockRaw>();
+            var options = new DbOptions().SetCreateIfMissing(false);
+            int damaged = 0;
+
+            using (RocksDb db = RocksDb.Open(options, dbPath))
+            {
+                using (Iterator it = db.NewIterator())
+                {
+                    byte[] prefix = { HeightPrefix };
+                    it.Seek(prefix);
+
+                    while (it.Valid())
+                    {
+                        byte[] key = it.Key();
+                        if (key.Length != 5 || key[0] != HeightPrefix)
+                        {
+                            break;                       // past the last 'h' key
+                        }
+
+                        int height = BinaryPrimitives.ReadInt32BigEndian(key.AsSpan(1, 4));
+                        byte[] indexedHash = it.Value();
+
+                        byte[]? raw = db.Get(BlockKey(indexedHash));
+                        if (raw == null)
+                        {
+                            damaged++;
+                            Console.Error.WriteLine("height " + height + " is indexed but its block is not there");
+                            it.Next();
+                            continue;
+                        }
+
+                        byte[] actualHash = DoubleSha256(raw, 0, 80);
+                        if (!actualHash.AsSpan().SequenceEqual(indexedHash))
+                        {
+                            damaged++;
+                            Console.Error.WriteLine("height " + height + " does not hash to the hash it is filed under");
+                        }
+
+                        var block = new BlockRaw
+                        {
+                            Path = "rocksdb:" + dbPath,
+                            BlockIndex = height,         // height, not a position in a file
+                            Offset = -1,
+                            Size = raw.Length,
+                            Raw = raw,
+                            DisplayHash = ToDisplayHex(actualHash),
+                        };
+                        block.SetHeaderFields();
+                        blocks.Add(block);
+
+                        it.Next();
+                    }
+                }
+            }
+
+            if (damaged > 0)
+            {
+                Console.Error.WriteLine(damaged + " blocks in the store are damaged");
+            }
+
+            return blocks;
+        }
+
+        /// <summary>
+        /// Pulls one block back out of the store by height, as the raw serialized bytes. Null when
+        /// the database does not hold that height. Opens the database for the one read, so this is
+        /// for spot checks rather than a loop - a loop should open it once itself.
+        /// </summary>
+        public static byte[]? ReadBlockFromRocksDb(string dbPath, int height)
+        {
+            var options = new DbOptions().SetCreateIfMissing(false);
+
+            using (RocksDb db = RocksDb.Open(options, dbPath))
+            {
+                byte[]? hash = db.Get(HeightKey(height));
+                if (hash == null)
+                {
+                    return null;
+                }
+                return db.Get(BlockKey(hash));
+            }
         }
 
         // ------------------------------------------------------------------------------------
