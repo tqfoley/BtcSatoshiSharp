@@ -6,7 +6,7 @@ using System.Net.Sockets;
 using System.Security.Cryptography;
 using System.Text;
 
-namespace main3
+namespace main
 {
     /// <summary>
     /// Standalone Bitcoin P2P block downloader.
@@ -49,7 +49,7 @@ namespace main3
         public sealed class Options
         {
             /// <summary>Directory the blk*.dat files are written to.</summary>
-            public string OutputDirectory = "C:\\btcblock\\claudeblocks";
+            public string OutputDirectory = "";
 
             /// <summary>How many peers to download from at once. This is the main speed dial.</summary>
             public int PeerCount = 12;
@@ -179,7 +179,7 @@ namespace main3
         // Entry point
         // ------------------------------------------------------------------------------------
 
-        static async Task<int> Main3(string[] args)
+        public static async Task<int> MainBlockDownload2(string[] args)
         {
             var opt = new Options();
             try
@@ -196,6 +196,24 @@ namespace main3
                 PrintUsage();
                 return 2;
             }
+
+            
+
+            string dataDirectory;
+  if (OperatingSystem.IsWindows())
+  {
+      dataDirectory = "C:\\btcblock\\claudeblocks";
+  }
+  else if (OperatingSystem.IsMacOS())
+  {
+      dataDirectory = "/Users/trevorfoley/Documents/blocks/";
+  }
+  else
+  {
+      throw new PlatformNotSupportedException();
+  }
+  opt.OutputDirectory = dataDirectory;
+   
 
             if (opt.OutputDirectory.Length == 0)
                 opt.OutputDirectory = ResolveDefaultOutputDirectory();
@@ -374,6 +392,7 @@ refuse to touch a directory holding blk*.dat files it did not create.");
             var chain = new HeaderChain(Path.Combine(_opt.OutputDirectory, "headers.dat"));
             SeedGenesis(chain);
             Console.WriteLine("cached headers   : " + (chain.Tip + 1));
+            Console.WriteLine("syncing headers - block download starts when this finishes");
             await SyncHeadersAsync(chain, token);
             Console.WriteLine("header tip       : " + chain.Tip + " " + ToDisplayHex(chain.TipHash));
 
@@ -505,6 +524,7 @@ refuse to touch a directory holding blk*.dat files it did not create.");
         async Task SyncHeadersAsync(HeaderChain chain, CancellationToken ct)
         {
             var sw = Stopwatch.StartNew();
+            long lastReportMs = 0;
 
             while (!ct.IsCancellationRequested && chain.Tip < _opt.StopHeight)
             {
@@ -534,8 +554,13 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                             int added = ApplyHeaders(chain, payload);
                             if (added == 0) { chain.Flush(); return; }          // peer has nothing past our tip
 
-                            if (chain.Tip % 50000 < added)
+                            chain.Flush();      // headers survive a Ctrl+C mid-sync
+
+                            if (sw.ElapsedMilliseconds - lastReportMs >= 2000)
+                            {
+                                lastReportMs = sw.ElapsedMilliseconds;
                                 Console.WriteLine("  headers " + chain.Tip + " (" + sw.Elapsed.TotalSeconds.ToString("F0") + "s)");
+                            }
                         }
                         chain.Flush();
                         return;
@@ -840,7 +865,7 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                 catch (Exception ex)
                 {
                     peer?.Dispose();
-                    Debug.WriteLine("connect " + ep + " failed: " + ex.Message);
+                    Console.WriteLine("  connect " + ep + " failed: " + ex.Message);
                 }
             }
             return null;

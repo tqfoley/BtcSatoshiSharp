@@ -59,8 +59,13 @@ namespace main4
     /// file. This is the project's entry point - to run one of the other experiments instead,
     /// rename this method to Main4 and rename that file's Main2/Main3 back to Main.
     /// </summary>
+    /// 
+    
     public class MainBlockHex
     {
+
+        public static string btcBlocksDirectory = "/Users/trevorfoley/Documents/blocks"; //"C:\\btcblock\\claudeblocks"
+
         // Handy early blocks to breakpoint on.
         const string Block2Hash = "000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd";
         const string Block3Hash = "0000000082b5015589a3fdf2d4baff403e6f0be035a5d9742c1cae6295464449";
@@ -151,7 +156,7 @@ namespace main4
         }
 
 
-        static int Main(string[] args)
+        public static int MainBlockHex2(string[] args)
         {
             bool rocksDbLoaded = false;
             if(!rocksDbLoaded)
@@ -189,8 +194,8 @@ namespace main4
                     int scanned;
                     int scannedByHash;
                     int scannedByIndex;
-                    BlockRaw? foundByHash = FindBlockByHash(@"C:\btcblock\claudeblocks", reqBlock3ByHash.FileIndex, reqBlock3ByHash.Hash, out scannedByHash);
-                    BlockRaw? foundByIndex = FindBlockByPosition(@"C:\btcblock\claudeblocks", reqBlock3ByIndex.FileIndex, reqBlock3ByIndex.BlockIndex, out scannedByIndex);
+                    BlockRaw? foundByHash = FindBlockByHash(btcBlocksDirectory, reqBlock3ByHash.FileIndex, reqBlock3ByHash.Hash, out scannedByHash);
+                    BlockRaw? foundByIndex = FindBlockByPosition(btcBlocksDirectory, reqBlock3ByIndex.FileIndex, reqBlock3ByIndex.BlockIndex, out scannedByIndex);
 
 
                     if (foundByHash != foundByIndex)
@@ -219,7 +224,7 @@ namespace main4
                     if (false)
                     {
                         var files = new List<string>();
-                        foreach (string file in Directory.EnumerateFiles(@"C:\btcblock\claudeblocks", "blk*.dat"))
+                        foreach (string file in Directory.EnumerateFiles(btcBlocksDirectory, "blk*.dat"))
                         {
                             // A three-character extension in the pattern is treated as a PREFIX match on Windows,
                             // so "*.dat" also hands back blk00000.database. Check the real ending.
@@ -281,7 +286,7 @@ namespace main4
                     while (currentIndex < 111)
                     {
 
-                        foundByIndex = FindBlockByPosition(@"C:\btcblock\claudeblocks", 0, currentIndex, out scannedByIndex);
+                        foundByIndex = FindBlockByPosition(btcBlocksDirectory, 0, currentIndex, out scannedByIndex);
                         if (foundByIndex!.DisplayHash == "00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3" ||
                             foundByIndex!.DisplayHash == "00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962" ||
                             foundByIndex!.DisplayHash == "00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f")
@@ -319,7 +324,7 @@ namespace main4
                         while (currentIndex2 < 10)
                         {
 
-                            foundByIndex = FindBlockByPosition("C:\\btcblock\\claudeblocks", 0, currentIndex2, out scannedByIndex);
+                            foundByIndex = FindBlockByPosition(btcBlocksDirectory, 0, currentIndex2, out scannedByIndex);
                             if (foundByIndex == null) break;      // file holds fewer blocks than this
 
 
@@ -352,11 +357,11 @@ namespace main4
                     int blkFile = 0;
                     while(blkFile < 8)
                     {
-                        List<BlockRaw> blocksInFile = ReadAllBlocks(@"C:\btcblock\claudeblocks", blkFile);
+                        List<BlockRaw> blocksInFile = ReadAllBlocks(btcBlocksDirectory, blkFile);
                         allBlocks.AddRange(blocksInFile);
                         blkFile++;
                     }
-                    //List<BlockRaw> allBlocksOneFile = ReadAllBlocks(@"C:\btcblock\claudeblocks", 0); // only blk00000.dat
+                    //List<BlockRaw> allBlocksOneFile = ReadAllBlocks(btcBlocksDirectory, 0); // only blk00000.dat
 
 
 

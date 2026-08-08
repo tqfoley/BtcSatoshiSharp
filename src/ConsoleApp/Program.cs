@@ -17,7 +17,7 @@ using static SatoshiSharpLib.Helpers;
 
 
 
-namespace main2
+namespace main
 {
     public class SatoshiSharp
     {
@@ -125,8 +125,12 @@ namespace main2
         }
 
 
-        static void Main2(string[] args)
+        static async Task<int> Main(string[] args)
         {
+            //return await MainBlockDownload.MainBlockDownload2(args);
+            main4.MainBlockHex.MainBlockHex2(args);
+            return 0;
+
             Console.WriteLine("Read Settings");
             var settings = SettingsReader.ReadSettings(Path.Combine(Helpers.GetParentDirectory(".", 4), "settings.json"));
             Console.WriteLine($"Block Chain data: {settings.BlockChainDataDirectory}");
