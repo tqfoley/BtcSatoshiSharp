@@ -1,5 +1,5 @@
 {
-  "BlockChainDataDirectory": "C:\\btcblock\\claudeblocks",
+  "BlockChainDataDirectory": "C:\\btcblock\\notclaudeblocks",
   "version": "1.0.0",
   "logging": {
     "filePath": "logs/app.log"

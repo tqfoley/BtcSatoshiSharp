@@ -64,7 +64,7 @@ namespace main4
     public class MainBlockHex
     {
 
-        public static string btcBlocksDirectory = "/Users/trevorfoley/Documents/blocks"; //"C:\\btcblock\\claudeblocks"
+        public static string btcBlocksDirectory = "C:\\btcblock\\notclaudeblocks";//"/Users/trevorfoley/Documents/blocks"; //"C:\\btcblock\\claudeblocks"
 
         // Handy early blocks to breakpoint on.
         const string Block2Hash = "000000006a625f06636b8bb6ac7b960a8d03705d1ace08b1a19da3fdcc99ddbd";
@@ -182,7 +182,7 @@ namespace main4
 
                 try
                 {
-                    Request reqBlock3ByHash = new Request();
+                    /*Request reqBlock3ByHash = new Request();
                     reqBlock3ByHash.FileIndex = 0;
                     reqBlock3ByHash.Hash = Block3Hash;
 
@@ -211,13 +211,17 @@ namespace main4
                     {
                         PrintSummary(foundByHash, scannedByHash);
                         PrintSummary(foundByIndex, scannedByIndex);
-                    }
+                    }*/
 
 
                     //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00001.dat", 10);
                     //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00002.dat", 10);
                     //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00003.dat", 10);
                     //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00004.dat", 10);
+                    int MAXBLKDATFILE = 30;
+
+                    // read all blk file and print the highest timestamp and lowest for each file and print it out
+                    PrintTimestampRangePerFile(btcBlocksDirectory, MAXBLKDATFILE);
 
 
                     // order ALL .dat files by timestamp
@@ -245,9 +249,9 @@ namespace main4
 
                     if (false)
                     {
-                        DeleteAllFilesIn("C:\\btcblock\\inOrder\\");
+                        //DeleteAllFilesIn("C:\\btcblock\\inOrder\\");
                     }
-
+                    /*
 
                     //claude's fake block 33 raw date 01000000e3f6664d5af37062b934f983ed1033e2011b42c9b04735276c7ccbe50000000033c56986d991564d8f2e5d6b3b98105c882a5b108738d0994407de8b72935ac4efc86849ffff001df9649d460101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1d04ffff001d12414c5433332f464f524b2d464958545552450400000000ffffffff0100f2052a01000000434104804d71f6a91c908a973cae7ef4363f7689520116b995d6936328de00be56f92baee0dabf3a240e0ed2dce7f374f12cbba7649808528236cb04c558f028dd61edac00000000
                     //claude's fake block 33 hash    0000000096a151f27d9cd2d706b6b8e16ba43e7e290bbb77f9eff8fe1d20c66c parent  00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3   ← identical to real block 33 time    1231603951(12s after the real block) nonce   1184720121 bits    1d00ffff(unchanged — difficulty is consensus -fixed in this epoch)
@@ -280,7 +284,7 @@ namespace main4
 
                     }
 
-
+                    
                     int currentIndex = 0;
                     string prevHash = "";
                     while (currentIndex < 111)
@@ -312,10 +316,10 @@ namespace main4
 
                     }
 
+                    */
 
 
-
-                    if (true)
+                    if (false)
                     {
                         // assumes blocks in order
 
@@ -324,12 +328,12 @@ namespace main4
                         while (currentIndex2 < 10)
                         {
 
-                            foundByIndex = FindBlockByPosition(btcBlocksDirectory, 0, currentIndex2, out scannedByIndex);
-                            if (foundByIndex == null) break;      // file holds fewer blocks than this
+                            var foundByIndex2 = FindBlockByPosition(btcBlocksDirectory, 0, currentIndex2);
+                            if (foundByIndex2 == null) break;      // file holds fewer blocks than this
 
 
-                            string h = foundByIndex.GetPrevBlockHash().Substring(40);
-                            Console.WriteLine(currentIndex2 + "     " + h + " " + foundByIndex.DisplayHash.Substring(40));
+                            string h = foundByIndex2.GetPrevBlockHash().Substring(40);
+                            Console.WriteLine(currentIndex2 + "     " + h + " " + foundByIndex2.DisplayHash.Substring(40));
 
                             currentIndex2++;
                         }
@@ -340,34 +344,62 @@ namespace main4
 
 
 
+                    // Read Blocks into memory even the forked blocks from ALL Block Files 
+                    // Read Blocks into memory even the forked blocks from ALL Block Files 
+                    // Read Blocks into memory even the forked blocks from ALL Block Files 
+                    // Read Blocks into memory even the forked blocks from ALL Block Files 
+                    // Read Blocks into memory even the forked blocks from ALL Block Files 
+                    // Read Blocks into memory even the forked blocks from ALL Block Files 
 
-
-
-                    Console.WriteLine("Longest Chain Harness");
+                    // 65 seconds for 250 blk####.dat files
 
                     List<MyRawBlock<BlockRaw>> rawBlocks = new List<MyRawBlock<BlockRaw>>();
-
-                    // One pass over the file for all of them. Asking FindBlockByPosition for block 0,
-                    // then block 1, and so on re-walks the file from the start every time, which is
-                    // where the harness was spending its time - and it cannot run off the end here,
-                    // since the file itself says how many blocks there are.
                     var readClock = Stopwatch.StartNew();
 
                     List<BlockRaw> allBlocks = new List<BlockRaw>();
                     int blkFile = 0;
-                    while(blkFile < 8)
+                    while(blkFile < MAXBLKDATFILE) // limit Blk files to MAXBLKDATFILE for testing
                     {
                         List<BlockRaw> blocksInFile = ReadAllBlocks(btcBlocksDirectory, blkFile);
                         allBlocks.AddRange(blocksInFile);
                         blkFile++;
                     }
                     //List<BlockRaw> allBlocksOneFile = ReadAllBlocks(btcBlocksDirectory, 0); // only blk00000.dat
-
-
-
-
-                    Console.WriteLine("blk00000.dat holds " + allBlocks.Count + " blocks, read in "
+                    Console.WriteLine("Loaded " + allBlocks.Count + " blocks, read in "
                                       + readClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+
+
+
+
+                    // read the headers.dat file
+
+                    // read the headers.dat file
+                    // read the headers.dat file
+                    // read the headers.dat file
+                    // read the headers.dat file
+                    // read the headers.dat file
+                    // read the headers.dat file                    // read the headers.dat file
+                    List<HeaderRecord> headers = ReadHeadersFile(btcBlocksDirectory);
+
+                    HeaderRecord[] headersArray = headers.ToArray();
+
+
+                    //block 333222 hash 00000000000000000220f06a0e8d4591e93829be148fa51062f1c3ac228d1b68
+                    //block 305822 hash 00000000000000005c61c7d3af58fee0cb3b5746c150d4cb904797b7f2b0e19f
+
+                    var myheader = headers.Where(x => x.Height == 305822).FirstOrDefault();
+                    if (myheader == null)
+                    {
+                        Console.WriteLine("no header at height 961111 - headers.dat stops at height "
+                                          + (headers.Count - 1));
+                    }
+                    else
+                    {
+                        Console.WriteLine("height " + myheader.Height + " hash " + myheader.GetDisplayHash());
+                    }
+
+
+
 
                     foreach (BlockRaw block in allBlocks)
                     {
@@ -387,14 +419,54 @@ namespace main4
                         BuildLongestChain(rawBlock, state);
                     }
 
-                    int deleted = PruneShortForks(state, 3);
-
                     SetNextLinks(state);
 
-                    MyBlock<BlockRaw>? currentBlock = state.blockZero;
-                    string? prevhash = null;
 
+
+                    MyBlock<BlockRaw>? currentBlock = state.blockZero;
+                    int myHeaderIndex = 0;
+                    while (currentBlock != null && myHeaderIndex < state.byHash.Count -1)
+                    {
+                        //Console.WriteLine("height " + currentBlock.height + " " + currentBlock.hash);
+                        //if (prevhash != null && prevhash != currentBlock.prevHash)
+                        {
+                          //  Console.WriteLine("error: prevhash " + prevhash + " does not match currentBlock.prevHash " + currentBlock.prevHash);
+                            //throw new Exception("prevhash mismatch");
+                        }
+                        //prevhash = currentBlock.hash;
+
+                        currentBlock = currentBlock.nextLink;
+
+                        if (headersArray[myHeaderIndex].GetDisplayHash() != currentBlock!.prevHash)
+                        {
+
+                        }
+                        myHeaderIndex++;
+
+
+
+                    }
+
+
+                    int deleted = PruneShortForks(state, 3);
+
+
+
+                    //MyBlock<BlockRaw>? 
+                        currentBlock = state.blockZero;
+                    string? prevhash = null;
+                     
                     MyBlock<BlockRaw>? blockAtHeight119221 = null;
+
+
+                    // 133 MB * 3900 = 518700 MB = 518 GB
+                    // 4 megs theoritical max block size 4*960000 = 3840000 MB = 3.84 TB
+                    // sha 256 hash 32 * 960000 = 30720000 bytes = 30 MB
+
+                    // block 961111 hash 00000000000000000000f34b4d14ebd20a90621dd8287de069a9c5b2333d2ba3
+                    //height 961111 hash 00000000000000000000f34b4d14ebd20a90621dd8287de069a9c5b2333d2ba3
+
+                    // stoped at blk00017
 
                     while (currentBlock != null)
                     {
@@ -411,6 +483,9 @@ namespace main4
                             blockAtHeight119221 = currentBlock;
                         }
                     }
+
+
+
 
                     MyBlock<BlockRaw>? currBlock = state.blockZero;
                     while (currBlock != null)
@@ -435,6 +510,16 @@ namespace main4
                         // stored, which is this string backwards. GetHashAsString does the reversing.
                         Console.WriteLine("tx hash: " + t.GetHashAsString());
                     }
+
+
+
+
+                    // got here
+                    // got here
+                    // got here
+                    // got here
+                    // got here
+                    // got here
 
                     // Walk the longest chain and parse each block's bytes into a SatoshiSharpLib.Block,
                     // so header and Transactions are filled in rather than just the raw bytes sitting
@@ -559,12 +644,12 @@ namespace main4
 
                     Console.WriteLine("total transactions: " + allTransactions.Count);
 
-                    if (false)
+                    if (true)
                     {
                         // Save all blocks to rocksdb. state.blockZero is the root, and the walk follows
                         // nextLink to the tip, so what lands in the database is the longest chain in
                         // height order - not the 730 blocks still parked waiting on a parent.
-                        string rocksDbPath = "C:\\btcblock\\rocksdb\\blocks";
+                        string rocksDbPath = "C:\\btcblock\\rocksdb\\blocks1";
 
                         var rocksClock = Stopwatch.StartNew();
                         int savedToRocksDb = SaveBlocksToRocksDb(rocksDbPath, state.blockZero);
@@ -1731,6 +1816,100 @@ Examples:
             PrintTimestampRun(count + " largest timestamps", byTime.GetRange(byTime.Count - count, count));
         }
 
+        /// <summary>
+        /// Walks every blk#####.dat in a directory and prints one line per file: how many blocks
+        /// it holds, its lowest and highest header timestamp, and the span between them. The
+        /// lowest and highest across all the files together follow at the end.
+        ///
+        /// Only the 8-byte record headers and the 80-byte block headers are read - block bodies
+        /// are seeked over and nothing is hashed - so a directory of 128 MiB files is walked in
+        /// about the time it takes to read them off disk.
+        ///
+        /// The ranges will overlap between files, and the earliest block in a file is usually not
+        /// the first one in it: MainBlockDownload writes blocks in the order they arrive off the
+        /// wire, which is not height order, and a header timestamp is the miner's own clock
+        /// rather than a verified time.
+        /// </summary>
+        public static void PrintTimestampRangePerFile(string directory, int MAXBLKDATFILE)
+        {
+            if (!Directory.Exists(directory))
+                throw new DirectoryNotFoundException("no such directory: " + directory);
+
+            byte[] key = ReadXorKey(directory);
+
+            var paths = new List<string>();
+            foreach (string file in Directory.EnumerateFiles(directory, "blk*.dat"))
+            {
+                // A three-character extension in the pattern is treated as a PREFIX match on
+                // Windows, so "*.dat" also hands back blk00000.database. Check the real ending.
+                if (!file.EndsWith(".dat", StringComparison.OrdinalIgnoreCase)) continue;
+                paths.Add(file);
+            }
+
+            // The indexes are zero padded to five digits, so ordinal order is numeric order.
+            paths.Sort(StringComparer.OrdinalIgnoreCase);
+
+            Console.WriteLine();
+            Console.WriteLine("timestamp range per file in " + directory);
+
+            if (paths.Count == 0)
+            {
+                Console.WriteLine("  no blk*.dat files here");
+                return;
+            }
+
+            Console.WriteLine("  " + "file".PadRight(14) + " " + "blocks".PadLeft(7)
+                              + "  " + "lowest".PadRight(20) + "  " + "highest".PadRight(20) + "  span");
+
+            long totalBlocks = 0;
+            uint overallLowest = uint.MaxValue;
+            uint overallHighest = uint.MinValue;
+
+
+            int count = 0;
+            foreach (string path in paths)
+            {
+                List<TimestampedRecord> records = ReadTimestampedRecords(path, key, withHashes: false);
+                totalBlocks += records.Count;
+
+                if (records.Count == 0)
+                {
+                    Console.WriteLine("  " + Path.GetFileName(path).PadRight(14) + " " + "0".PadLeft(7) + "  empty");
+                    continue;
+                }
+
+                uint lowest = records[0].UnixTime;
+                uint highest = records[0].UnixTime;
+                foreach (TimestampedRecord r in records)
+                {
+                    if (r.UnixTime < lowest) lowest = r.UnixTime;
+                    if (r.UnixTime > highest) highest = r.UnixTime;
+                }
+
+                if (lowest < overallLowest) overallLowest = lowest;
+                if (highest > overallHighest) overallHighest = highest;
+
+                Console.WriteLine("  " + Path.GetFileName(path).PadRight(14)
+                                  + " " + records.Count.ToString().PadLeft(7)
+                                  + "  " + FormatUnixTime(lowest).PadRight(20)
+                                  + "  " + FormatUnixTime(highest).PadRight(20)
+                                  + "  " + FormatGap((long)highest - lowest));
+
+                if(count++ > MAXBLKDATFILE)
+                    break;
+
+            }
+
+            Console.WriteLine();
+            Console.WriteLine("  " + paths.Count + " files, " + totalBlocks + " blocks");
+            if (totalBlocks > 0)
+            {
+                Console.WriteLine("  lowest  " + FormatUnixTime(overallLowest) + "  (unix " + overallLowest + ")");
+                Console.WriteLine("  highest " + FormatUnixTime(overallHighest) + "  (unix " + overallHighest + ")");
+                Console.WriteLine("  span    " + FormatGap((long)overallHighest - overallLowest));
+            }
+        }
+
         static void PrintTimestampRun(string title, List<TimestampedRecord> run)
         {
             Console.WriteLine();
@@ -1752,6 +1931,10 @@ Examples:
                                   + run[i].Hash.Substring(30));
             }
         }
+
+        /// <summary>A header timestamp as "2009-01-10 16:12:19Z".</summary>
+        static string FormatUnixTime(uint unixTime) =>
+            DateTimeOffset.FromUnixTimeSeconds(unixTime).UtcDateTime.ToString("u");
 
         /// <summary>
         /// A signed gap as +d hh:mm:ss. Negative is not an error - it is a miner whose clock ran
@@ -2088,29 +2271,29 @@ Examples:
         /// Walks one blk file looking for the block with this display-order hash. Returns null if
         /// the file does not hold it; blocksScanned says how many records were checked.
         /// </summary>
-        public static BlockRaw? FindBlockByHash(string directory, int fileIndex, string displayHash, out int blocksScanned)
+        public static BlockRaw? FindBlockByHash(string directory, int fileIndex, string displayHash)
         {
             byte[] want = ReverseCopy(Convert.FromHexString(NormalizeHash(displayHash)));
-            return ScanBlkFile(directory, fileIndex, want, -1, out blocksScanned);
+            return ScanBlkFile(directory, fileIndex, want, -1);
         }
 
         /// <summary>
         /// Takes the blockIndex'th block in the file, counting record by record from 0. Returns
         /// null if the file holds fewer blocks than that; blocksScanned is then the total.
         /// </summary>
-        public static BlockRaw? FindBlockByPosition(string directory, int fileIndex, int blockIndex, out int blocksScanned)
+        public static BlockRaw? FindBlockByPosition(string directory, int fileIndex, int blockIndex)
         {
             if (blockIndex < 0) throw new ArgumentOutOfRangeException(nameof(blockIndex), "block position starts at 0");
-            return ScanBlkFile(directory, fileIndex, null, blockIndex, out blocksScanned);
+            return ScanBlkFile(directory, fileIndex, null, blockIndex);
         }
 
         /// <summary>
         /// One pass over a blk file's records. Exactly one of wantHash (internal byte order) and
         /// wantIndex (0-based position, -1 when unused) selects the block.
         /// </summary>
-        static BlockRaw? ScanBlkFile(string directory, int fileIndex, byte[]? wantHash, int wantIndex, out int blocksScanned)
+        static BlockRaw? ScanBlkFile(string directory, int fileIndex, byte[]? wantHash, int wantIndex)
         {
-            blocksScanned = 0;
+            int blocksScanned = 0;
 
             string path = BlkFilePath(directory, fileIndex);
             if (!File.Exists(path))
@@ -3097,6 +3280,156 @@ Examples:
             {
                 Console.Error.WriteLine("could not read " + indexPath + ": " + ex.Message);
             }
+        }
+
+        // ------------------------------------------------------------------------------------
+        // headers.dat - the header chain MainBlockDownload caches, in height order
+        // ------------------------------------------------------------------------------------
+
+        /// <summary>Bytes in a block header. Fixed by the protocol, and headers.dat is nothing else.</summary>
+        const int HeaderBytes = 80;
+
+        /// <summary>One header out of headers.dat, at the height its position in the file gives it.</summary>
+        public sealed class HeaderRecord
+        {
+            /// <summary>Position in the file, which is the height - the file is written in order.</summary>
+            public int Height;
+
+            /// <summary>The 80 header bytes exactly as they sit in the file.</summary>
+            public byte[] Raw = Array.Empty<byte>();
+
+            /// <summary>The header's hash, little endian, the order it is stored in on disk.</summary>
+            public byte[] HashBytes = Array.Empty<byte>();
+
+            /// <summary>
+            /// The hash in the reversed order explorers show. Built on demand rather than held as
+            /// a field: a million of these strings is another 150 MB, and most callers want the
+            /// hash for only a handful of the headers they read.
+            /// </summary>
+            public string GetDisplayHash()
+            {
+                return ToDisplayHex(HashBytes);
+            }
+
+            /// <summary>The parent's hash in display order, from bytes 4..35 of the header.</summary>
+            public string GetPrevBlockHash()
+            {
+                return ToDisplayHex(GetPrevBlockHashBytes());
+            }
+
+            /// <summary>The same 32 bytes as stored, for comparing against raw header bytes.</summary>
+            public byte[] GetPrevBlockHashBytes()
+            {
+                return Raw.AsSpan(4, 32).ToArray();
+            }
+
+            /// <summary>The miner's timestamp in unix seconds, from bytes 68..71.</summary>
+            public uint GetUnixTime()
+            {
+                return BinaryPrimitives.ReadUInt32LittleEndian(Raw.AsSpan(68, 4));
+            }
+
+            public DateTime GetTimeUtc()
+            {
+                return DateTimeOffset.FromUnixTimeSeconds(GetUnixTime()).UtcDateTime;
+            }
+        }
+
+        /// <summary>
+        /// Reads headers.dat out of a blk file directory and prints what it covers.
+        ///
+        /// The file is the header chain MainBlockDownload builds while it syncs: 80 bytes per
+        /// header, one after another, with no magic bytes, no size fields and nothing else in
+        /// between - so its length is exactly 80 times the number of headers in it. It is never
+        /// XORed, unlike the blk files beside it, so xor.dat does not come into this.
+        ///
+        /// What makes it worth reading is the order. Headers go in as the chain is walked, tip
+        /// first never happening, so record i IS the block at height i - which the blk files
+        /// cannot tell you, since they hold blocks in the order the peers answered. This is where
+        /// a height for a block read out of a blk file comes from: match its hash against these.
+        ///
+        /// Every header names its parent, so the file checks itself. Header i's bytes 4..35 have
+        /// to be header i-1's hash; where that fails the file was torn or truncated and every
+        /// height past the break would be wrong, so the read stops there and says so.
+        ///
+        /// Costs memory the same way ReadAllBlocks does - about 200 bytes a header, so roughly
+        /// 190 MB for a million of them. Pass maxHeaders to read only the start of the chain.
+        /// </summary>
+        public static List<HeaderRecord> ReadHeadersFile(string directory, int maxHeaders = int.MaxValue)
+        {
+            if (maxHeaders < 1)
+                throw new ArgumentOutOfRangeException(nameof(maxHeaders), "ask for at least one header");
+
+            string path = Path.Combine(directory, "headers.dat");
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException("no headers.dat in " + directory
+                                                + " - MainBlockDownload writes it while it syncs headers", path);
+            }
+
+            var clock = Stopwatch.StartNew();
+            var headers = new List<HeaderRecord>();
+
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20);
+
+            long usable = fs.Length - (fs.Length % HeaderBytes);
+            if (usable != fs.Length)
+            {
+                Console.Error.WriteLine("headers.dat: ignoring a trailing partial header of "
+                                        + (fs.Length - usable) + " bytes");
+            }
+
+            bool broken = false;
+            byte[] previousHash = Array.Empty<byte>();
+
+            for (long off = 0; off < usable && headers.Count < maxHeaders; off += HeaderBytes)
+            {
+                byte[] raw = new byte[HeaderBytes];
+                fs.ReadExactly(raw, 0, HeaderBytes);
+
+                if (headers.Count > 0 && !previousHash.AsSpan().SequenceEqual(raw.AsSpan(4, 32)))
+                {
+                    Console.Error.WriteLine("headers.dat: chain breaks at height " + headers.Count
+                                            + " - stopping there, the file holds "
+                                            + (usable / HeaderBytes) + " headers");
+                    broken = true;
+                    break;
+                }
+
+                byte[] hash = DoubleSha256(raw, 0, HeaderBytes);
+                headers.Add(new HeaderRecord { Height = headers.Count, Raw = raw, HashBytes = hash });
+                previousHash = hash;
+            }
+
+            clock.Stop();
+
+            Console.WriteLine();
+            Console.WriteLine("headers.dat: " + headers.Count + " headers, read in "
+                              + clock.Elapsed.TotalSeconds.ToString("F1") + "s");
+
+            if (headers.Count == 0)
+            {
+                Console.WriteLine("  the file is empty");
+                return headers;
+            }
+
+            PrintHeaderLine("first", headers[0]);
+            PrintHeaderLine("tip  ", headers[headers.Count - 1]);
+
+            long onDisk = usable / HeaderBytes;
+            if (!broken && headers.Count < onDisk)
+            {
+                Console.WriteLine("  stopped at maxHeaders - the file holds " + onDisk);
+            }
+
+            return headers;
+        }
+
+        static void PrintHeaderLine(string label, HeaderRecord header)
+        {
+            Console.WriteLine("  " + label + " height " + header.Height.ToString().PadLeft(7)
+                              + "  " + FormatUnixTime(header.GetUnixTime())
+                              + "  " + header.GetDisplayHash());
         }
 
         // ------------------------------------------------------------------------------------

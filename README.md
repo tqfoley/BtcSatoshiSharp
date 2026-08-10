@@ -510,3 +510,19 @@ Which helper does what
 ├─────────────────────────────────────────┼───────────┼─────────────────┤
 │ header.GetMerkleRootAsString()          │ yes       │ UPPER           │
 └─────────────────────────────────────────┴───────────┴─────────────────┘
+
+
+
+blocks.index is a flat array of fixed 48-byte records, one per block the downloader wrote, appended in write order. No header, no separator, no sorting — BlockStore.Write (MainBlockDownload.cs:1329) emits one on every block:
+
+┌───────┬─────────────┬────────────────────────────────────────────────────────────────────────────────┐
+│ bytes │    field    │                                    encoding                                    │
+├───────┼─────────────┼────────────────────────────────────────────────────────────────────────────────┤
+│ 0–31  │ block hash  │ raw 32 bytes, little-endian (internal order — reverse to display)              │
+├───────┼─────────────┼────────────────────────────────────────────────────────────────────────────────┤
+│ 32–35 │ file number │ uint32 LE → blk<n:D5>.dat                                                      │
+├───────┼─────────────┼────────────────────────────────────────────────────────────────────────────────┤
+│ 36–43 │ offset      │ int64 LE → position of the record's 4 magic bytes; block bytes start 8 later   │
+├───────┼─────────────┼────────────────────────────────────────────────────────────────────────────────┤
+│ 44–47 │ block size  │ uint32 LE → serialized block length, same value as the record's own size field │
+└───────┴─────────────┴────────────────────────────────────────────────────────────────────────────────┘

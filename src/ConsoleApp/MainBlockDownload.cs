@@ -78,6 +78,13 @@ namespace main
             /// <summary>Extra block hashes to fetch (display order hex), e.g. known orphans.</summary>
             public List<string> ExtraBlockHashes = new List<string>();
 
+            /// <summary>
+            /// Rebuild blocks.index by scanning the blk*.dat files before doing anything else.
+            /// Needed when the index was lost, and when something rewrote the .dat files and left
+            /// the offsets in it pointing at the wrong bytes.
+            /// </summary>
+            public bool RebuildIndex = false;
+
             public TimeSpan ConnectTimeout = TimeSpan.FromSeconds(5);
 
             /// <summary>Per-message deadline. A peer that goes quiet is dropped and its blocks requeued.</summary>
@@ -264,6 +271,7 @@ namespace main
                     case "--stop": opt.StopHeight = int.Parse(Next("--stop")); break;
                     case "--max-file-mb": opt.MaxBlockFileBytes = long.Parse(Next("--max-file-mb")) * 1024 * 1024; break;
                     case "--max-attempts": opt.MaxAttemptsPerBlock = int.Parse(Next("--max-attempts")); break;
+                    case "--rebuild-index": opt.RebuildIndex = true; break;
                     case "--no-witness": opt.RequestWitness = false; break;
                     case "--no-checksum": opt.VerifyChecksums = false; break;
                     case "--node": opt.FixedNodes.Add(ParseEndPoint(Next("--node"))); break;
@@ -293,11 +301,16 @@ Bitcoin block downloader - writes un-XORed blk*.dat files.
   --extra <file>       text file of extra block hashes to fetch, one per line
   --max-attempts <n>   peers that may fail on one block before giving up (default 10)
   --max-file-mb <n>    blk file rollover size in MiB          (default 128)
+  --rebuild-index      scan the blk*.dat files and write blocks.index from what
+                       is in them, then carry on. Use it when the index was lost,
+                       or when something rewrote the .dat files behind its back
   --no-witness         request stripped (non-witness) blocks
   --no-checksum        skip per-message checksum verification
 
 The output directory must be empty or previously written by this tool - it will
-refuse to touch a directory holding blk*.dat files it did not create.");
+refuse to touch a directory holding blk*.dat files it did not create. Passing
+--rebuild-index overrides that check, so do not point it at a Bitcoin Core
+datadir unless you mean to have this tool append to those files.");
         }
 
         static IPEndPoint ParseEndPoint(string text)
@@ -375,6 +388,13 @@ refuse to touch a directory holding blk*.dat files it did not create.");
             Console.WriteLine("xor              : none (xor.dat written as eight zero bytes)");
 
             Directory.CreateDirectory(_opt.OutputDirectory);
+
+            // Before the store opens, so it loads the index we just wrote rather than the one we
+            // are replacing - and so a directory with no index at all becomes one it will accept.
+            if (_opt.RebuildIndex)
+            {
+                RebuildBlockIndex(_opt.OutputDirectory);
+            }
 
             // Constructed before anything is written: it refuses to run against a directory that
             // holds blk*.dat files it did not create, so we never scribble on a real Core datadir.
@@ -1182,7 +1202,7 @@ refuse to touch a directory holding blk*.dat files it did not create.");
 
         sealed class BlockStore : IDisposable
         {
-            const int IndexRecordBytes = 48;      // hash[32] fileNo[4] offset[8] size[4]
+            public const int IndexRecordBytes = 48;      // hash[32] fileNo[4] offset[8] size[4]
 
             readonly string _dir;
             readonly long _maxFileBytes;
@@ -1208,7 +1228,8 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                     throw new InvalidOperationException(
                         "'" + dir + "' already holds blk*.dat files but no blocks.index, so it was not written by " +
                         "this downloader (a Bitcoin Core datadir, perhaps). Refusing to touch it - pick an empty " +
-                        "directory with --out.");
+                        "directory with --out, or pass --rebuild-index to scan those files and index what is in " +
+                        "them, which also makes this downloader start appending to them.");
                 }
 
                 _index = new FileStream(indexPath, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Read, 1 << 16);
@@ -1348,6 +1369,171 @@ refuse to touch a directory holding blk*.dat files it did not create.");
                 try { _blk.Flush(); _blk.Dispose(); } catch { }
                 try { _index.Flush(); _index.Dispose(); } catch { }
             }
+        }
+
+        // ------------------------------------------------------------------------------------
+        // Rebuilding blocks.index from the blk*.dat files
+        // ------------------------------------------------------------------------------------
+
+        /// <summary>A record claiming to be bigger than this is garbage, not a block.</summary>
+        const int MaxBlockRecordBytes = 32 * 1024 * 1024;
+
+        /// <summary>
+        /// Writes blocks.index from scratch by walking the blk*.dat files, which holds everything
+        /// the index does - the .dat records carry the magic bytes, the size and the header, and
+        /// the header hashes to the block hash. Nothing in the index is information the data does
+        /// not already have; it exists so a resumed run does not have to do this scan.
+        ///
+        /// Use it when the index was lost, and when something rewrote the .dat files without
+        /// updating it - SortBlockFileByTimestamp reorders a file in place, which keeps every
+        /// block but moves them all, and every offset in the index is then wrong.
+        ///
+        /// Each file is walked from byte 0, record by record. A record that does not start with
+        /// the magic bytes, or claims a size that runs past the end of the file, ends the walk of
+        /// THAT file - whatever follows is unreachable anyway, since the records are only
+        /// findable by stepping through them in order. What was read up to that point is kept.
+        ///
+        /// The new index is built in a temporary file and moved into place at the end, because a
+        /// half-written blocks.index is worse than none: BlockStore trusts the last record in it
+        /// to say where the data ends, and would truncate a .dat file back to that point.
+        ///
+        /// Returns how many records were written.
+        /// </summary>
+        public static int RebuildBlockIndex(string directory)
+        {
+            if (!Directory.Exists(directory))
+                throw new DirectoryNotFoundException("no such directory: " + directory);
+
+            // Core obfuscates blk*.dat with this key by absolute file offset. Nothing in this
+            // class applies it - it writes zeroes and reads plain bytes - so a real key means the
+            // scan below would see noise instead of magic bytes and index nothing.
+            string xorPath = Path.Combine(directory, "xor.dat");
+            if (File.Exists(xorPath))
+            {
+                foreach (byte k in File.ReadAllBytes(xorPath))
+                {
+                    if (k != 0)
+                    {
+                        throw new InvalidOperationException(
+                            xorPath + " is not all zeroes, so the blk files are obfuscated. This downloader " +
+                            "only reads and writes plain files - de-obfuscate them first, or rebuild the " +
+                            "index with something that applies the key.");
+                    }
+                }
+            }
+
+            var files = new SortedDictionary<int, string>();
+            foreach (string path in Directory.GetFiles(directory, "blk*.dat"))
+            {
+                // A three-character extension in the pattern is a PREFIX match on Windows, so
+                // "*.dat" also hands back blk00000.database. Check the real ending.
+                if (!path.EndsWith(".dat", StringComparison.OrdinalIgnoreCase)) continue;
+
+                string name = Path.GetFileNameWithoutExtension(path);
+                if (name.Length != 8) continue;                       // blk + five digits
+                int fileNo;
+                if (!int.TryParse(name.Substring(3), out fileNo)) continue;
+                files[fileNo] = path;
+            }
+
+            if (files.Count == 0)
+                throw new InvalidOperationException("no blk*.dat files in " + directory + " - nothing to index");
+
+            string indexPath = Path.Combine(directory, "blocks.index");
+            string temp = indexPath + ".rebuilding.tmp";
+
+            int written = 0;
+            int duplicates = 0;
+            var seen = new HashSet<byte[]>(new ByteArrayComparer());
+
+            var clock = Stopwatch.StartNew();
+
+            using (var index = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None, 1 << 16))
+            {
+                byte[] recordHeader = new byte[8];
+                byte[] header80 = new byte[80];
+                byte[] rec = new byte[BlockStore.IndexRecordBytes];
+
+                foreach (KeyValuePair<int, string> entry in files)
+                {
+                    int fileNo = entry.Key;
+                    string path = entry.Value;
+                    int inFile = 0;
+                    long offset = 0;
+                    string stoppedBecause = "";
+
+                    using (var blk = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20))
+                    {
+                        while (offset + 8 <= blk.Length)
+                        {
+                            blk.Position = offset;
+                            blk.ReadExactly(recordHeader, 0, 8);
+
+                            bool magicOk = true;
+                            for (int i = 0; i < 4; i++)
+                            {
+                                if (recordHeader[i] != Magic[i]) magicOk = false;
+                            }
+                            if (!magicOk)
+                            {
+                                stoppedBecause = "no magic bytes at offset " + offset;
+                                break;
+                            }
+
+                            uint size = BinaryPrimitives.ReadUInt32LittleEndian(recordHeader.AsSpan(4, 4));
+                            if (size < 81 || size > MaxBlockRecordBytes)
+                            {
+                                stoppedBecause = "record at offset " + offset + " claims " + size + " bytes";
+                                break;
+                            }
+                            if (offset + 8 + size > blk.Length)
+                            {
+                                stoppedBecause = "record at offset " + offset + " runs " +
+                                                 (offset + 8 + size - blk.Length) + " bytes past the end of the file";
+                                break;
+                            }
+
+                            blk.ReadExactly(header80, 0, 80);
+                            byte[] hash = DoubleSha256(header80, 0, 80);
+
+                            // Indexed even when it is a repeat: the index has to account for every
+                            // byte of the file, because BlockStore reads the end of the last record
+                            // in it as the point to append from. BlockStore.Have folds the repeats
+                            // away when it loads, the same as it always did.
+                            if (!seen.Add(hash)) duplicates++;
+
+                            hash.CopyTo(rec, 0);
+                            BinaryPrimitives.WriteUInt32LittleEndian(rec.AsSpan(32, 4), (uint)fileNo);
+                            BinaryPrimitives.WriteInt64LittleEndian(rec.AsSpan(36, 8), offset);
+                            BinaryPrimitives.WriteUInt32LittleEndian(rec.AsSpan(44, 4), size);
+                            index.Write(rec, 0, rec.Length);
+
+                            written++;
+                            inFile++;
+                            offset += 8 + size;
+                        }
+
+                        string note = "";
+                        if (stoppedBecause.Length > 0)
+                        {
+                            note = " - stopped: " + stoppedBecause + ", " + (blk.Length - offset) + " bytes not indexed";
+                        }
+                        Console.WriteLine("  " + Path.GetFileName(path) + ": " + inFile + " blocks" + note);
+                    }
+                }
+            }
+
+            File.Move(temp, indexPath, overwrite: true);
+            clock.Stop();
+
+            Console.WriteLine("rebuilt blocks.index: " + written + " blocks from " + files.Count
+                              + " files in " + clock.Elapsed.TotalSeconds.ToString("F1") + "s");
+            if (duplicates > 0)
+            {
+                Console.WriteLine("  " + duplicates + " of them are blocks that appear more than once");
+            }
+
+            return written;
         }
 
         // ------------------------------------------------------------------------------------
