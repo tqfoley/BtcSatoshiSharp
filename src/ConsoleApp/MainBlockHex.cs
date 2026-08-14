@@ -979,7 +979,7 @@ namespace main4
             {
                 if(false)
                 {
-                    int MAXBLKDATFILE = 41;
+                    int MAXBLKDATFILE = 91; // 91 good for 10 (250,000)
 
                     List<MyRawBlock<BlockRaw>> rawBlocks = new List<MyRawBlock<BlockRaw>>();
                     var readClock = Stopwatch.StartNew();
@@ -1101,7 +1101,7 @@ namespace main4
                         }
 
                         atBlock = atBlock.nextLink;
-                        if (count++ % 20000 == 0)
+                        if (count++ % 12500 == 0)
                         {
                             Console.WriteLine(count + " parsed height " + parsed.header.BlockNumber + " " + parsed.header.Hash);
                         }
@@ -1141,7 +1141,7 @@ namespace main4
                     int segment = 0;
                     int totalCopied = 0;
 
-                    while (f != null && segment < 8)
+                    while (f != null && segment < 11)
                     {
                         segment++;
 
@@ -1202,15 +1202,13 @@ namespace main4
 
                 }
 
-
-
                 if(false)
                 {
 
 
-                    string rocksDbBase2 = "C:\\btcblock\\rocksdb\\blocks";
+                    string rocksDbBase2 = "C:\\btcblock\\rocksdb\\blocksFirst10";
 
-                    var loadedBlocks = LoadBlocks(0, 149999, rocksDbBase2);
+                    var loadedBlocks = LoadBlocks(0, 249999, rocksDbBase2);
 
                     //var loadedBlocks2 = LoadBlocks(200000, 249999, rocksDbBase2);
 
@@ -1231,7 +1229,7 @@ namespace main4
                     // UTXO set of the whole chain and looking it up - which the run that wrote this
                     // file already did, once, and filed the answers. Reading them back is a single
                     // sequential pass over the file with nothing held but the result.
-                    const int dbHeights = 50000;//200000;
+                    //const int dbHeights = 50000;//200000;
 
                     string allTxDbPath = "C:\\btcblock\\rocksdb\\transactions_all.db";
 
@@ -1296,7 +1294,7 @@ namespace main4
                         i++;
                     }
 
-                    SortedList<long, string> lookupAddress = new SortedList<long, string>();
+                    Dictionary<long, string> lookupAddress = new Dictionary<long, string>(1 << 22);
 
 
                     // The balances out of allTransactions rather than out of the blocks. Nothing is
@@ -1313,7 +1311,7 @@ namespace main4
                     // it, and null when this has been switched off, which is what that check is for.
                     List<AddressBalance>? walletsFromList = null;
                     {
-                        const int listHeights = 200000;
+                        const int listHeights = 250000;
 
                         string listCsvPath = "C:\\btcblock\\rocksdb\\address_balances_from_list.csv";
 
@@ -1333,24 +1331,26 @@ namespace main4
 
                     for (int i2 = 0; i2 < MAXLISTSsimpleTransactionsList; i2++)
                     {
-                        simpleTransaction.saveToDisk("C:\\btcblock\\rocksdb\\simpletx\\OneToSixSet", i2, simpleTransactionsList[i2].Value, simpleTransactionsListCounts[i2]);
+                        simpleTransaction.saveToDisk("C:\\btcblock\\rocksdb\\simpletx\\OneToTen", i2, simpleTransactionsList[i2].Value, simpleTransactionsListCounts[i2]);
                     }
 
 
-                    saveLookupAddress(lookupAddress, "C:\\btcblock\\rocksdb\\addresslookup1.dat");
+                    saveLookupAddress(toSortedLookup(lookupAddress), "C:\\btcblock\\rocksdb\\addresslookup10.dat");
 
 
-                    SortedList<long, string> lookupAddress2 = loadLookupAddress("C:\\btcblock\\rocksdb\\addresslookup1.dat");
+                    SortedList<long, string> lookupAddress2 = loadLookupAddress("C:\\btcblock\\rocksdb\\addresslookup10.dat");
 
                 }
+                
+                if(true)
                 { 
                     List<KeyValuePair<int, simpleTransaction[]>> simpleTransactionsList = new List<KeyValuePair<int, simpleTransaction[]>>();
                     //int[] simpleTransactionsListCounts = new int[MAXLISTSsimpleTransactionsList];
 
-                    for (int i2 = 0; i2 < 2; i2++)
+                    for (int i2 = 0; i2 < MAXLISTSsimpleTransactionsList; i2++)
                     {
                         simpleTransactionsList.Add(new KeyValuePair<int, simpleTransaction[]>(i2,
-                            simpleTransaction.loadFromDisk("C:\\btcblock\\rocksdb\\simpletx\\One_to_SevenSet", i2)));
+                            simpleTransaction.loadFromDisk("C:\\btcblock\\rocksdb\\simpletx\\OneToTen", i2)));
                     }
 
                     simpleTransaction g = new simpleTransaction();
@@ -1359,7 +1359,7 @@ namespace main4
 
 
 
-                    SortedList<long, string> lookupAddress2 = loadLookupAddress("C:\\btcblock\\rocksdb\\simpletx\\addresslookup1.dat");
+                    SortedList<long, string> lookupAddress2 = loadLookupAddress("C:\\btcblock\\rocksdb\\simpletx\\addresslookup10.dat");
 
                     // The shrunk key back to the string it came from, for printing only.
                     //
@@ -1591,7 +1591,7 @@ namespace main4
         }
 
         public const int MAXLISTSsimpleTransactionsList = 10;
-        public const int MAXSIZEsimpleTransactionsList = 5000000;
+        public const int MAXSIZEsimpleTransactionsList = 15000000;  // about 350 megs
 
 
 
@@ -5507,7 +5507,7 @@ Examples:
         }
 
         static long countCollisions = 0;
-        public static void addLookupAddress(long shrunkAddress, string address, SortedList<long, string> lookupAddress)
+        public static void addLookupAddress(long shrunkAddress, string address, Dictionary<long, string> lookupAddress)
         {
             //SortedList<long, string> addressLookup = new SortedList<long, string>();
             //addressLookup.Add(1234567890123L, "bc1q...");
@@ -5555,6 +5555,54 @@ Examples:
         /// key and a length and then allocating whatever the length happened to be.
         /// </summary>
         public const string LookupAddressMagic = "LKUPADR1";
+
+
+        /// <summary>
+        /// The lookup table as a SortedList, built once from the Dictionary the walk accumulates
+        /// into. What saveLookupAddress and every by-key query want is sorted order; what the walk
+        /// wants is a cheap insert, and those are not the same structure.
+        ///
+        /// Accumulating straight into the SortedList is what this exists to avoid, and the cost of
+        /// it is not a constant factor. An Add at a random key binary-searches in O(log n) and then
+        /// shifts every key above it along by one - and every value with it, since a SortedList is
+        /// two parallel arrays - so filling one with n addresses that arrive in no particular order
+        /// moves on the order of n^2/2 elements in total. Measured on this machine, over random
+        /// keys:
+        ///
+        ///     125,000 addresses     1.4s        4x the addresses,
+        ///     250,000               5.7s        16x the time - which is
+        ///     500,000              23.2s        what quadratic looks like
+        ///   1,000,000              87.5s
+        ///
+        /// The 6.5 million distinct addresses of the first 200,000 blocks are another forty times
+        /// the last of those, so somewhere around an hour, all of it spent in Array.Copy. The same
+        /// 6.5 million into a Dictionary and through here is a second or two: the Dictionary insert
+        /// is O(1), the sort is one O(n log n) pass over the keys, and the Adds below arrive in
+        /// ascending order, so each one binary-searches to the end of the array and shifts nothing.
+        ///
+        /// That last part is the whole reason this sorts the keys first rather than handing the
+        /// Dictionary's own enumeration order to the SortedList - doing that would be the quadratic
+        /// fill again, just moved.
+        /// </summary>
+        public static SortedList<long, string> toSortedLookup(Dictionary<long, string> lookupAddress)
+        {
+            if (lookupAddress == null)
+            {
+                throw new ArgumentNullException(nameof(lookupAddress));
+            }
+
+            long[] keys = new long[lookupAddress.Count];
+            lookupAddress.Keys.CopyTo(keys, 0);
+            Array.Sort(keys);
+
+            var sorted = new SortedList<long, string>(keys.Length);
+            for (int i = 0; i < keys.Length; i++)
+            {
+                sorted.Add(keys[i], lookupAddress[keys[i]]);
+            }
+
+            return sorted;
+        }
 
         /// <summary>
         /// The whole table to one file: the magic above, then the entry count as four bytes little
@@ -5809,11 +5857,36 @@ Examples:
         /// <param name="csvPath">Where to write the full table, or null to only return it.</param>
         public static List<AddressBalance> CollectAddressBalancesFromTransactions(
             List<Transaction> transactions, int heightLimit, string? csvPath,
-            List<KeyValuePair<int, simpleTransaction[]>> simpleTransactionsList, int[] simpleTransactionsListCounts, SortedList<long, string> lookupAddress
+            List<KeyValuePair<int, simpleTransaction[]>> simpleTransactionsList, int[] simpleTransactionsListCounts, Dictionary<long, string> lookupAddress
             )
         {
 
 
+
+            // shrinkStringAddress is a base58 long division and two SHA-256 every time it is
+            // called, about a microsecond, and the calls repeat far more than they differ. The
+            // same address is shrunk once for every record it appears in; a transaction with n
+            // senders and m receivers emits n*m records over n+m distinct strings, and a busy
+            // address comes back thousands of times across the walk. Cached, a repeat is one hash
+            // of the string.
+            //
+            // Keyed on the string rather than on the script it came from, because that is what the
+            // call sites hold and because two different scripts that name the same address should
+            // land on the same key - which is the point of the key.
+            var shrunkCache = new Dictionary<string, long>(1 << 22);
+            var shrinker = new simpleTransaction();
+
+            long Shrink(string address)
+            {
+                if (shrunkCache.TryGetValue(address, out long already))
+                {
+                    return already;
+                }
+
+                long shrunk = shrinker.shrinkStringAddress(address);
+                shrunkCache.Add(address, shrunk);
+                return shrunk;
+            }
 
             var balances = new Dictionary<string, AddressBalance>();
             var unspent = new Dictionary<OutPoint, UnspentOutput>();
@@ -6017,7 +6090,7 @@ Examples:
                     {
                         throw new Exception("Bad");
                     }
-                    t.To = t.shrinkStringAddress(gotIn.FirstOrDefault()!);
+                    t.To = Shrink(gotIn.FirstOrDefault()!);
                     
                     addLookupAddress(t.To, gotIn.FirstOrDefault()!, lookupAddress);
                     
@@ -6049,14 +6122,14 @@ Examples:
                             List<simpleTransaction> trans = new List<simpleTransaction>();
 
                             simpleTransaction t = new simpleTransaction();
-                            t.From = t.shrinkStringAddress(sentOut.FirstOrDefault()!);
+                            t.From = Shrink(sentOut.FirstOrDefault()!);
                             t.AmountAndBlock = t.computeAmountAndBlock(amountsIn.FirstOrDefault(), 0);
 
                             if (amountsIn.FirstOrDefault() > ((Int64)2) << simpleTransaction.AmountBits)
                             {
                                 throw new Exception("Bad");
                             }
-                            t.To = t.shrinkStringAddress(gotIn.FirstOrDefault()!);
+                            t.To = Shrink(gotIn.FirstOrDefault()!);
 
 
                             addLookupAddress(t.To, gotIn.FirstOrDefault()!, lookupAddress);
@@ -6108,9 +6181,9 @@ Examples:
                             }
                             else 
                             { 
-                                t.From = t.shrinkStringAddress(x[i]);
+                                t.From = Shrink(x[i]);
                                 t.AmountAndBlock = t.computeAmountAndBlock(y[i], 0);
-                                t.To = t.shrinkStringAddress(gotIn.FirstOrDefault()!);
+                                t.To = Shrink(gotIn.FirstOrDefault()!);
 
 
                                 addLookupAddress(t.To, gotIn.FirstOrDefault()!, lookupAddress); // redundant adds
@@ -6156,9 +6229,9 @@ Examples:
                                 }
                                 simpleTransaction t = new simpleTransaction();
 
-                                t.From = t.shrinkStringAddress(sentOut.FirstOrDefault());
+                                t.From = Shrink(sentOut.FirstOrDefault());
                                 t.AmountAndBlock = t.computeAmountAndBlock(y[i], 0);
-                                t.To = t.shrinkStringAddress(x[i]);
+                                t.To = Shrink(x[i]);
 
                                 addLookupAddress(t.From, sentOut.FirstOrDefault()!, lookupAddress); // redundant adds
                                 addLookupAddress(t.To, x[i], lookupAddress);
@@ -6235,9 +6308,9 @@ Examples:
                             }
                             else
                             {
-                                t.From = t.shrinkStringAddress(senders[i]);
+                                t.From = Shrink(senders[i]);
                                 t.AmountAndBlock = t.computeAmountAndBlock(share, 0);
-                                t.To = t.shrinkStringAddress(receivers[j]);
+                                t.To = Shrink(receivers[j]);
 
                                 addLookupAddress(t.From, senders[i], lookupAddress); // redundant adds
                                 addLookupAddress(t.To, receivers[j], lookupAddress); // redundant adds
