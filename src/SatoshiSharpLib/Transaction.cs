@@ -10,6 +10,23 @@ namespace SatoshiSharpLib
 {
     public class Transaction
     {
+
+        public int BlockHeight { get; set; }
+
+        /// <summary>
+        /// Where this transaction starts inside its block's serialization, counted from byte 0 of
+        /// the block - so the 80 byte header and the transaction count varint are already past.
+        /// </summary>
+        public int ByteOffset { get; set; }
+
+        /// <summary>
+        /// How many bytes it occupies there, witness data included when it has any. Together with
+        /// ByteOffset this is enough to cut the transaction back out of the block it came from,
+        /// which is why neither this class nor the store beside it keeps a second copy of them.
+        /// </summary>
+        public int ByteLength { get; set; }
+
+
         /// <summary>
         /// The txid: SHA-256 applied twice to the stripped (no witness) serialization.
         ///

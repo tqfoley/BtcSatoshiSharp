@@ -1,17 +1,18 @@
+using Microsoft.Data.Sqlite;
 using Org.BouncyCastle.Utilities;
 using Org.BouncyCastle.Utilities.Encoders;
+using RocksDbSharp;
+using SatoshiSharpLib;
 using System.Buffers.Binary;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Drawing;
 using System.Numerics;
+using System.Runtime.ConstrainedExecution;
 using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text.Json;
 using System.Threading.Tasks.Dataflow;
-using SatoshiSharpLib;
-using RocksDbSharp;
-
 // The longest-chain harness lives in ConsoleApp.LongestChainHarness, and MyRawBlock / MyBlock /
 // ChainState are nested inside it. `using static` pulls the nested types and the static methods in
 // unqualified, so BuildLongestChain(...) and MyRawBlock<byte[]> below read the same here as they do
@@ -60,7 +61,7 @@ namespace main4
     /// rename this method to Main4 and rename that file's Main2/Main3 back to Main.
     /// </summary>
     /// 
-    
+
     public class MainBlockHex
     {
 
@@ -136,7 +137,7 @@ namespace main4
         static int FindIn100ArrayOfBlockRaw(BlockRaw[] array, int count, string hash)
         {
             int index = 0;
-            
+
             foreach (var raw in array)
             {
                 if (raw != null && raw.DisplayHash == hash)
@@ -146,7 +147,7 @@ namespace main4
 
                 index++;
 
-                if(index >= count)
+                if (index >= count)
                 {
                     break;
                 }
@@ -159,7 +160,7 @@ namespace main4
         public static int MainBlockHex2(string[] args)
         {
             bool rocksDbLoaded = false;
-            if(!rocksDbLoaded)
+            if (false)
             {
                 Console.WriteLine("rocksdb not loaded");
 
@@ -218,7 +219,7 @@ namespace main4
                     //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00002.dat", 10);
                     //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00003.dat", 10);
                     //PrintTimestampExtremes(@"C:\btcblock\claudeblocks\blk00004.dat", 10);
-                    int MAXBLKDATFILE = 30;
+                    int MAXBLKDATFILE = 41; // block to read      1 for 100000    22 for 200000
 
                     // read all blk file and print the highest timestamp and lowest for each file and print it out
                     PrintTimestampRangePerFile(btcBlocksDirectory, MAXBLKDATFILE);
@@ -254,7 +255,7 @@ namespace main4
                     /*
 
                     //claude's fake block 33 raw date 01000000e3f6664d5af37062b934f983ed1033e2011b42c9b04735276c7ccbe50000000033c56986d991564d8f2e5d6b3b98105c882a5b108738d0994407de8b72935ac4efc86849ffff001df9649d460101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1d04ffff001d12414c5433332f464f524b2d464958545552450400000000ffffffff0100f2052a01000000434104804d71f6a91c908a973cae7ef4363f7689520116b995d6936328de00be56f92baee0dabf3a240e0ed2dce7f374f12cbba7649808528236cb04c558f028dd61edac00000000
-                    //claude's fake block 33 hash    0000000096a151f27d9cd2d706b6b8e16ba43e7e290bbb77f9eff8fe1d20c66c parent  00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3   ← identical to real block 33 time    1231603951(12s after the real block) nonce   1184720121 bits    1d00ffff(unchanged — difficulty is consensus -fixed in this epoch)
+                    //claude's fake block 33 hash    0000000096a151f27d9cd2d706b6b8e16ba43e7e290bbb77f9eff8fe1d20c66c parent  00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3   â† identical to real block 33 time    1231603951(12s after the real block) nonce   1184720121 bits    1d00ffff(unchanged â€” difficulty is consensus -fixed in this epoch)
                     //01234567 123456789012345678901234567890123456789012345678901234567890123 123456789012345678901234567890123456789012345678901234567890123                                                                                                                            01234567890123456789012345678901234567890123
                     string fakeBlock33 = "{\"data\":{\"33\":{\"raw_block\":\"01000000e3f6664d5af37062b934f983ed1033e2011b42c9b04735276c7ccbe50000000033c56986d991564d8f2e5d6b3b98105c882a5b108738d0994407de8b72935ac4efc86849ffff001df9649d460101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff1d04ffff001d12414c5433332f464f524b2d464958545552450400000000ffffffff0100f2052a01000000434104804d71f6a91c908a973cae7ef4363f7689520116b995d6936328de00be56f92baee0dabf3a240e0ed2dce7f374f12cbba7649808528236cb04c558f028dd61edac00000000\",\"decoded_raw_block\":{\"hash\":\"0000000096a151f27d9cd2d706b6b8e16ba43e7e290bbb77f9eff8fe1d20c66c\",\"confirmations\":-1,\"height\":33,\"version\":1,\"versionHex\":\"00000001\",\"merkleroot\":\"c45a93728bde074499d03887105b2a885c10983b6b5d2e8f4d5691d98669c533\",\"time\":1231603951,\"mediantime\":1231601457,\"nonce\":1184720121,\"bits\":\"1d00ffff\",\"difficulty\":1,\"chainwork\":\"0000000000000000000000000000000000000000000000000000002200220022\",\"previousblockhash\":\"00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3\",\"strippedsize\":237,\"size\":237,\"weight\":948,\"nTx\":1,\"tx\":[\"c45a93728bde074499d03887105b2a885c10983b6b5d2e8f4d5691d98669c533\"]}}},\"context\":{\"code\":200,\"source\":\"SYNTHETIC\",\"results\":1,\"state\":960939,\"market_price_usd\":63703,\"cache\":{\"live\":false,\"duration\":120,\"since\":\"2026-08-04 03:37:36\",\"until\":\"2026-08-04 03:39:36\",\"time\":null},\"api\":{\"version\":\"2.0.95-ie\",\"last_major_update\":\"2022-11-07 02:00:00\",\"next_major_update\":\"2023-11-12 02:00:00\",\"documentation\":\"https://blockchair.com/api/docs\",\"notice\":\"SYNTHETIC FIXTURE - not a historical block and not served by any explorer. Locally mined competitor to block 33 for fork / stale-tip detection testing.\"},\"servers\":\"SYNTHETIC\",\"time\":0.006392955780029297,\"render_time\":0.0043070316314697266,\"full_time\":0.010699987411499023,\"request_cost\":1}}";
                     string jsonBlock33 = "{\"data\":{\"33\":{\"raw_block\":\"01000000e3f6664d5af37062b934f983ed1033e2011b42c9b04735276c7ccbe5000000001012aaab3e3bffd34055aaa157bf78792d5c18f085635eda7046d89c08a0eabde3c86849ffff001d228c22400101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff0704ffff001d0138ffffffff0100f2052a01000000434104804d71f6a91c908a973cae7ef4363f7689520116b995d6936328de00be56f92baee0dabf3a240e0ed2dce7f374f12cbba7649808528236cb04c558f028dd61edac00000000\",\"decoded_raw_block\":{\"hash\":\"00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962\",\"confirmations\":960926,\"height\":33,\"version\":1,\"versionHex\":\"00000001\",\"merkleroot\":\"bdeaa0089cd84670da5e6385f0185c2d7978bf57a1aa5540d3ff3b3eabaa1210\",\"time\":1231603939,\"mediantime\":1231601457,\"nonce\":1076005922,\"bits\":\"1d00ffff\",\"difficulty\":1,\"chainwork\":\"0000000000000000000000000000000000000000000000000000002200220022\",\"nTx\":1,\"previousblockhash\":\"00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3\",\"nextblockhash\":\"00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f\",\"strippedsize\":215,\"size\":215,\"weight\":860,\"tx\":[\"bdeaa0089cd84670da5e6385f0185c2d7978bf57a1aa5540d3ff3b3eabaa1210\"]}}},\"context\":{\"code\":200,\"source\":\"T+R\",\"results\":1,\"state\":960939,\"market_price_usd\":63703,\"cache\":{\"live\":true,\"duration\":120,\"since\":\"2026-08-04 03:37:36\",\"until\":\"2026-08-04 03:39:36\",\"time\":null},\"api\":{\"version\":\"2.0.95-ie\",\"last_major_update\":\"2022-11-07 02:00:00\",\"next_major_update\":\"2023-11-12 02:00:00\",\"documentation\":\"https:\\/\\/blockchair.com\\/api\\/docs\",\"notice\":\"Try out our new API v.3: https:\\/\\/3xpl.com\\/data\"},\"servers\":\"API4,BTC5,BTC5,BTC5\",\"time\":0.006392955780029297,\"render_time\":0.0043070316314697266,\"full_time\":0.010699987411499023,\"request_cost\":1}}";
@@ -358,7 +359,7 @@ namespace main4
 
                     List<BlockRaw> allBlocks = new List<BlockRaw>();
                     int blkFile = 0;
-                    while(blkFile < MAXBLKDATFILE) // limit Blk files to MAXBLKDATFILE for testing
+                    while (blkFile < MAXBLKDATFILE) // limit Blk files to MAXBLKDATFILE for testing
                     {
                         List<BlockRaw> blocksInFile = ReadAllBlocks(btcBlocksDirectory, blkFile);
                         allBlocks.AddRange(blocksInFile);
@@ -425,12 +426,12 @@ namespace main4
 
                     MyBlock<BlockRaw>? currentBlock = state.blockZero;
                     int myHeaderIndex = 0;
-                    while (currentBlock != null && myHeaderIndex < state.byHash.Count -1)
+                    while (currentBlock != null && myHeaderIndex < state.byHash.Count - 1)
                     {
                         //Console.WriteLine("height " + currentBlock.height + " " + currentBlock.hash);
                         //if (prevhash != null && prevhash != currentBlock.prevHash)
                         {
-                          //  Console.WriteLine("error: prevhash " + prevhash + " does not match currentBlock.prevHash " + currentBlock.prevHash);
+                            //  Console.WriteLine("error: prevhash " + prevhash + " does not match currentBlock.prevHash " + currentBlock.prevHash);
                             //throw new Exception("prevhash mismatch");
                         }
                         //prevhash = currentBlock.hash;
@@ -453,9 +454,9 @@ namespace main4
 
 
                     //MyBlock<BlockRaw>? 
-                        currentBlock = state.blockZero;
+                    currentBlock = state.blockZero;
                     string? prevhash = null;
-                     
+
                     MyBlock<BlockRaw>? blockAtHeight119221 = null;
 
 
@@ -512,85 +513,81 @@ namespace main4
                     }
 
 
-
-
-                    // got here
-                    // got here
-                    // got here
-                    // got here
-                    // got here
-                    // got here
-
-                    // Walk the longest chain and parse each block's bytes into a SatoshiSharpLib.Block,
-                    // so header and Transactions are filled in rather than just the raw bytes sitting
-                    // in BlockRaw.Raw. blockZero -> nextLink is chain order, so header.BlockNumber ends
-                    // up being the real height.
-                    var parseClock = Stopwatch.StartNew();
-                    List<Block> parsedChain = new List<Block>();
-
-                    long totalTransactions = 0;
-                    long totalInputs = 0;
-                    long totalOutputs = 0;
-                    ulong totalOutputSats = 0;
-                    int merkleMismatches = 0;
-
                     List<Transaction> allTransactions = new List<Transaction>();
 
-                    MyBlock<BlockRaw>? atBlock = state.blockZero;
-                    int count = 0;
-                    while (atBlock != null)
+
+                    if (false)
                     {
-                        Block parsed = ParseBlock(atBlock.data, atBlock.height);
-                        parsedChain.Add(parsed);
+                        // get transactions instead of block data, memory intensive but useful for analysis
+                        var parseClock = Stopwatch.StartNew();
+                        List<Block> parsedChain = new List<Block>();
 
-                        foreach (Transaction tx in parsed.Transactions)
-                        {
-                            allTransactions.Add(tx);
-                        }
+                        long totalTransactions = 0;
+                        long totalInputs = 0;
+                        long totalOutputs = 0;
+                        ulong totalOutputSats = 0;
+                        int merkleMismatches = 0;
 
-                        totalTransactions += parsed.Transactions.Count;
-                        foreach (Transaction tx in parsed.Transactions)
+
+                        MyBlock<BlockRaw>? atBlock = state.blockZero;
+                        int count = 0;
+                        while (atBlock != null)
                         {
-                            totalInputs += tx.Inputs.Count;
-                            totalOutputs += tx.Outputs.Count;
-                            foreach (Transaction.TxOutput output in tx.Outputs)
+                            Block parsed = ParseBlock(atBlock.data, atBlock.height);
+                            parsedChain.Add(parsed);
+
+                            foreach (Transaction tx in parsed.Transactions)
                             {
-                                totalOutputSats += output.Value;
+                                allTransactions.Add(tx);
+                            }
+
+                            totalTransactions += parsed.Transactions.Count;
+                            foreach (Transaction tx in parsed.Transactions)
+                            {
+                                totalInputs += tx.Inputs.Count;
+                                totalOutputs += tx.Outputs.Count;
+                                foreach (Transaction.TxOutput output in tx.Outputs)
+                                {
+                                    totalOutputSats += output.Value;
+                                }
+                            }
+
+                            // Counted rather than thrown on: one bad block should not take the whole run
+                            // down when 119,000 others are fine.
+                            if (!MerkleRootMatches(parsed))
+                            {
+                                merkleMismatches++;
+                                if (merkleMismatches <= 5)
+                                {
+                                    Console.WriteLine("merkle mismatch at height " + parsed.header.BlockNumber
+                                                      + " " + parsed.header.Hash);
+                                }
+                            }
+
+                            atBlock = atBlock.nextLink;
+                            if (count++ % 20000 == 0)
+                            {
+                                Console.WriteLine(count + " parsed height " + parsed.header.BlockNumber + " " + parsed.header.Hash);
                             }
                         }
+                        parseClock.Stop();
 
-                        // Counted rather than thrown on: one bad block should not take the whole run
-                        // down when 119,000 others are fine.
-                        if (!MerkleRootMatches(parsed))
-                        {
-                            merkleMismatches++;
-                            if (merkleMismatches <= 5)
-                            {
-                                Console.WriteLine("merkle mismatch at height " + parsed.header.BlockNumber
-                                                  + " " + parsed.header.Hash);
-                            }
-                        }
 
-                        atBlock = atBlock.nextLink;
-                        if (count++ % 20000 == 0)
-                        {
-                            Console.WriteLine(count + " parsed height " + parsed.header.BlockNumber + " " + parsed.header.Hash);
-                        }
+
+                        Console.WriteLine("parsed " + parsedChain.Count + " blocks in "
+                                          + parseClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+                        Console.WriteLine("  transactions : " + totalTransactions);
+                        Console.WriteLine("  inputs       : " + totalInputs);
+                        Console.WriteLine("  outputs      : " + totalOutputs);
+                        Console.WriteLine("  output value : " + (totalOutputSats / 100000000.0).ToString("F8") + " BTC");
+                        Console.WriteLine("  merkle roots : " + (parsedChain.Count - merkleMismatches)
+                                          + " of " + parsedChain.Count + " match");
+
+                        var g = allTransactions.Last();
                     }
-                    parseClock.Stop();
 
 
-
-                    Console.WriteLine("parsed " + parsedChain.Count + " blocks in "
-                                      + parseClock.Elapsed.TotalSeconds.ToString("F1") + "s");
-                    Console.WriteLine("  transactions : " + totalTransactions);
-                    Console.WriteLine("  inputs       : " + totalInputs);
-                    Console.WriteLine("  outputs      : " + totalOutputs);
-                    Console.WriteLine("  output value : " + (totalOutputSats / 100000000.0).ToString("F8") + " BTC");
-                    Console.WriteLine("  merkle roots : " + (parsedChain.Count - merkleMismatches)
-                                      + " of " + parsedChain.Count + " match");
-
-                    if (true)  
+                    if (false)
                     {
                         // 119221 block 2nd transaction 382f663b0554c5986b295eec475166592c3c638e61afe7d7a2ea2100935ba3a6  
                         byte[] myhash = Convert.FromHexString("382f663b0554c5986b295eec475166592c3c638e61afe7d7a2ea2100935ba3a6");
@@ -640,33 +637,124 @@ namespace main4
                         }
                     }
 
-                    
+
 
                     Console.WriteLine("total transactions: " + allTransactions.Count);
 
-                    if (true)
+
+                    /*
+                     *         public class MyBlock<TData>
+        {
+            public string hash;
+            public string prevHash;
+            public TData data;
+            public MyBlock<TData>? prevLink;   // null on the first block of a chain
+            public MyBlock<TData>? nextLink;   // filled in by SetNextLinks, null before that and at a tip
+            public int height;                 // 0 at the root, parent + 1 everywhere else
+
+        }
+                     */
+
+                    // Copy the chain out in fixed-size runs and file each run in its own rocksdb
+                    // store. The copy is what makes a run addressable at all: SaveBlocksToRocksDb
+                    // takes a root and follows nextLink to the end, so handing it a slice means
+                    // building a chain of its own whose last node has a null nextLink. Only the
+                    // links are new - every copy points at the BlockRaw the original already held,
+                    // so this costs one small object per block and not a second copy of the bytes.
+                    //
+                    // One pointer walks the whole chain once. Written out a run at a time it went
+                    // back to the root for each one, so every run added re-walked everything below
+                    // it; here f simply carries on from wherever the previous run stopped.
+                    const int segmentBlocks = 50000;
+
+                    MyBlock<BlockRaw>? f = state.blockZero;
+                    int segment = 0;
+                    int totalCopied = 0;
+
+                    while (f != null && segment < 4)
                     {
-                        // Save all blocks to rocksdb. state.blockZero is the root, and the walk follows
-                        // nextLink to the tip, so what lands in the database is the longest chain in
-                        // height order - not the 730 blocks still parked waiting on a parent.
-                        string rocksDbPath = "C:\\btcblock\\rocksdb\\blocks1";
+                        segment++;
+
+                        MyBlock<BlockRaw>? head = null;
+                        MyBlock<BlockRaw>? tail = null;
+                        int copied = 0;
+
+                        // Counted, not measured against a height boundary, so a run holds exactly
+                        // segmentBlocks blocks whatever the heights in it happen to be.
+                        while (f != null && copied < segmentBlocks)
+                        {
+                            MyBlock<BlockRaw> copy = new MyBlock<BlockRaw>
+                            {
+                                hash = f.hash,
+                                prevHash = f.prevHash,
+
+                                // Carried over rather than left at its default: height is what the
+                                // rocksdb 'h' keys are built from, so a chain of copies that all
+                                // say zero files every block under height 0, each overwriting the
+                                // last, and the height index ends up holding one entry.
+                                height = f.height,
+
+                                data = f.data,
+                                prevLink = tail,
+                                nextLink = null,
+                            };
+
+                            if (tail == null)
+                            {
+                                head = copy;
+                            }
+                            else
+                            {
+                                tail.nextLink = copy;
+                            }
+
+                            tail = copy;
+                            copied++;
+                            f = f.nextLink;
+                        }
+
+                        totalCopied += copied;
+
+                        // The outer loop only runs while f is non-null, so the inner one always
+                        // copies at least one block and head is set by the time we reach here.
+                        string rocksDbPath = "C:\\btcblock\\rocksdb\\blocks" + segment;
+                        Console.WriteLine("segment " + segment + ": " + copied + " blocks, heights "
+                                          + head!.height + " to " + tail!.height + " -> " + rocksDbPath);
 
                         var rocksClock = Stopwatch.StartNew();
-                        int savedToRocksDb = SaveBlocksToRocksDb(rocksDbPath, state.blockZero);
+                        SaveBlocksToRocksDb(rocksDbPath, head);
                         rocksClock.Stop();
 
                         Console.WriteLine("  wrote in   : " + rocksClock.Elapsed.TotalSeconds.ToString("F1") + "s");
 
                         // Reopen it and pull one block back, to show the store stands on its own.
-                        byte[]? blockOneFromDb = ReadBlockFromRocksDb(rocksDbPath, 1);
-                        if (blockOneFromDb != null)
+                        // Asked for by this run's own first height rather than by 1: only these
+                        // heights were written here, so on every store past the first, height 1
+                        // comes back null and the check would quietly pass by doing nothing.
+                        int firstHeight = head.height;
+                        byte[]? firstFromDb = ReadBlockFromRocksDb(rocksDbPath, firstHeight);
+                        if (firstFromDb != null)
                         {
-                            Console.WriteLine("  reopened   : height 1 is "
-                                              + ToDisplayHex(DoubleSha256(blockOneFromDb, 0, 80))
-                                              + " (" + blockOneFromDb.Length + " bytes)");
+                            Console.WriteLine("  reopened   : height " + firstHeight + " is "
+                                              + ToDisplayHex(DoubleSha256(firstFromDb, 0, 80))
+                                              + " (" + firstFromDb.Length + " bytes)");
+                        }
+                        else
+                        {
+                            Console.WriteLine("  reopened   : height " + firstHeight + " is not in the store");
                         }
                     }
-                    
+
+                    if (segment == 0)
+                    {
+                        Console.WriteLine("nothing to copy - the chain is empty");
+                    }
+                    else
+                    {
+                        Console.WriteLine("wrote " + totalCopied + " blocks across " + segment
+                                          + " stores of up to " + segmentBlocks + " blocks each");
+                    }
+
 
                     return 0;
                 }
@@ -677,7 +765,7 @@ namespace main4
                 }
             }
             //else for rocksdb
-            if(false)
+            if (false)
             {
                 // load rocksdb
                 //
@@ -685,22 +773,111 @@ namespace main4
                 // blocks form the longest chain and in what order, and wrote that out. So there is
                 // no scanning, no chain to rebuild and nothing to sort here - the blocks come back
                 // in height order because that is how they were filed.
-                string rocksDbPath = "C:\\btcblock\\rocksdb\\blocks";
+                // One store per run the branch above wrote - blocks1, blocks2, and so on, each
+                // holding up to 50,000 blocks in height order. Read back in the same order they
+                // were written they concatenate into one chain, which is what makes the link
+                // check further down worth running: it is then testing the seams between the
+                // stores as well as the blocks inside each one.
+                string rocksDbBase = "C:\\btcblock\\rocksdb\\blocks";
+
+                // Counted first, and on its own: this is Directory.Exists until one is missing,
+                // so however many runs were written is however many get read - there is no count
+                // here to keep in step with the writer. Opening them is the expensive part and
+                // that happens below, once this knows how many there are to open.
+                int stores = 0;
+                while (Directory.Exists(rocksDbBase + (stores + 1)))
+                {
+                    stores++;
+                }
+
+                if (stores == 0)
+                {
+                    Console.Error.WriteLine("no stores found - looked for " + rocksDbBase + "1");
+                    Console.Error.WriteLine("set rocksDbLoaded to false to build them from the blk files first");
+                    return 1;
+                }
 
                 List<BlockRaw> loaded;
                 try
                 {
                     var loadClock = Stopwatch.StartNew();
-                    loaded = LoadBlocksFromRocksDb(rocksDbPath);
+
+                    // One store per thread. They are separate databases in separate directories
+                    // sharing no handle, and LoadBlocksFromRocksDb keeps everything it touches
+                    // local - its list, its options, its RocksDb and its iterator are all created
+                    // inside the call. So the only thing crossing threads is the array each
+                    // result is dropped into, and every task owns one slot of it.
+                    //
+                    // Worth doing because most of the cost is not the disk: every block is
+                    // re-hashed on the way out to check it against the hash it is filed under,
+                    // which is CPU work that scales rather than queueing behind one disk head.
+                    var perStore = new List<BlockRaw>[stores];
+                    var summary = new string[stores];
+
+                    Parallel.For(0, stores, i =>
+                    {
+                        string storePath = rocksDbBase + (i + 1);
+                        List<BlockRaw> fromStore = LoadBlocksFromRocksDb(storePath);
+                        perStore[i] = fromStore;
+
+                        // Built here, printed below in store order. Writing to the console from
+                        // inside the loop would put the lines down in whatever order the threads
+                        // happened to finish, which reads like the stores are out of order.
+                        if (fromStore.Count == 0)
+                        {
+                            summary[i] = "  " + Path.GetFileName(storePath) + " : empty";
+                        }
+                        else
+                        {
+                            summary[i] = "  " + Path.GetFileName(storePath) + " : " + fromStore.Count
+                                         + " blocks, heights " + fromStore[0].BlockIndex
+                                         + " to " + fromStore[fromStore.Count - 1].BlockIndex;
+                        }
+                    });
+
                     loadClock.Stop();
 
-                    Console.WriteLine("rocksdb loaded: " + loaded.Count + " blocks from " + rocksDbPath
-                                      + " in " + loadClock.Elapsed.TotalSeconds.ToString("F2") + "s");
+                    foreach (string line in summary)
+                    {
+                        Console.WriteLine(line);
+                    }
+
+                    // Joined back up in store order, which is height order - the threads finish in
+                    // whatever order they like but nothing reads perStore until they are all done.
+                    // Sized up front so the list does not copy its whole array every time it grows
+                    // past a couple of hundred thousand entries.
+                    int total = 0;
+                    foreach (List<BlockRaw> fromStore in perStore)
+                    {
+                        total += fromStore.Count;
+                    }
+
+                    loaded = new List<BlockRaw>(total);
+                    foreach (List<BlockRaw> fromStore in perStore)
+                    {
+                        loaded.AddRange(fromStore);
+                    }
+
+                    Console.WriteLine("rocksdb loaded: " + loaded.Count + " blocks from " + stores
+                                      + " stores in " + loadClock.Elapsed.TotalSeconds.ToString("F2") + "s");
+                }
+                catch (AggregateException ex)
+                {
+                    // Parallel.For collects everything that threw and hands it back in one of
+                    // these, whose own Message is just "One or more errors occurred" - the part
+                    // worth reading is inside it.
+                    Console.Error.WriteLine("could not load the stores:");
+                    foreach (Exception inner in ex.Flatten().InnerExceptions)
+                    {
+                        Console.Error.WriteLine("  " + inner.Message);
+                    }
+                    Console.Error.WriteLine("set rocksDbLoaded to false to build them from the blk files first");
+                    return 1;
                 }
                 catch (Exception ex)
                 {
-                    Console.Error.WriteLine("could not load the store: " + ex.Message);
-                    Console.Error.WriteLine("set rocksDbLoaded to false to build it from the blk files first");
+                    Console.Error.WriteLine("could not load the stores: " + ex.Message);
+                    Console.Error.WriteLine("set rocksDbLoaded to false to build them from the blk files first");
                     return 1;
                 }
 
@@ -776,9 +953,1257 @@ namespace main4
                 Console.WriteLine("  output value: " + (loadedOutputSats / 100000000.0).ToString("F8") + " BTC");
                 Console.WriteLine("  merkle roots: " + (loaded.Count - loadedMerkleMismatches)
                                   + " of " + loaded.Count + " match");
+
+
+                BlockRaw? prevBlock = null;
+                foreach (var l in loaded)
+                {
+                    //Console.WriteLine("height " + currentBlock.height + " " + currentBlock.hash);
+                    if (prevBlock != null && prevBlock.DisplayHash != l.previousHash)
+                    {
+                        Console.WriteLine("error: ");
+                        throw new Exception("prevhash mismatch");
+                    }
+                    prevBlock = l;
+                }
+
+                // block 199999 hash = 00000000000003a20def7a05a77361b9657ff954b2f2080e135ea6f5970da215
+
+                string g = loaded.Last().DisplayHash;
+
+
+                // save transactions
             }
+
+            if (true)
+            {
+                if(false)
+                {
+                    int MAXBLKDATFILE = 41;
+
+                    List<MyRawBlock<BlockRaw>> rawBlocks = new List<MyRawBlock<BlockRaw>>();
+                    var readClock = Stopwatch.StartNew();
+
+                    List<BlockRaw> allBlocks = new List<BlockRaw>();
+                    int blkFile = 0;
+                    while (blkFile < MAXBLKDATFILE) // limit Blk files to MAXBLKDATFILE for testing
+                    {
+                        List<BlockRaw> blocksInFile = ReadAllBlocks(btcBlocksDirectory, blkFile);
+                        allBlocks.AddRange(blocksInFile);
+                        blkFile++;
+                    }
+                    //List<BlockRaw> allBlocksOneFile = ReadAllBlocks(btcBlocksDirectory, 0); // only blk00000.dat
+                    Console.WriteLine("Loaded " + allBlocks.Count + " blocks, read in "
+                                      + readClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+
+
+
+
+                    // read the headers.dat file
+
+                    // read the headers.dat file
+                    // read the headers.dat file
+                    // read the headers.dat file
+                    // read the headers.dat file
+                    // read the headers.dat file
+                    // read the headers.dat file                    // read the headers.dat file
+                    List<HeaderRecord> headers = ReadHeadersFile(btcBlocksDirectory);
+
+                    HeaderRecord[] headersArray = headers.ToArray();
+
+
+                    //block 333222 hash 00000000000000000220f06a0e8d4591e93829be148fa51062f1c3ac228d1b68
+                    //block 305822 hash 00000000000000005c61c7d3af58fee0cb3b5746c150d4cb904797b7f2b0e19f
+
+                    var myheader = headers.Where(x => x.Height == 305822).FirstOrDefault();
+                    if (myheader == null)
+                    {
+                        Console.WriteLine("no header at height 961111 - headers.dat stops at height "
+                                          + (headers.Count - 1));
+                    }
+                    else
+                    {
+                        Console.WriteLine("height " + myheader.Height + " hash " + myheader.GetDisplayHash());
+                    }
+
+
+
+
+                    foreach (BlockRaw block in allBlocks)
+                    {
+                        rawBlocks.Add(new MyRawBlock<BlockRaw>
+                        {
+                            hash = block.DisplayHash.Substring(40),
+                            prevHash = block.GetPrevBlockHash().Substring(40),
+                            data = block
+                        });
+                    }
+
+                    ChainState<BlockRaw> state = new ChainState<BlockRaw>();
+
+                    foreach (var rawBlock in rawBlocks)
+                    {
+                        //Console.WriteLine($"Raw Block: Hash={rawBlock.hash}, PrevHash={rawBlock.prevHash}, Data={DescribeData(rawBlock.data)}");
+                        BuildLongestChain(rawBlock, state);
+                    }
+
+                    SetNextLinks(state);
+
+
+
+
+                    List<Transaction> allTransactions = new List<Transaction>();
+
+                    // get transactions instead of block data, memory intensive but useful for analysis
+                    var parseClock = Stopwatch.StartNew();
+                    List<Block> parsedChain = new List<Block>();
+
+                    long totalTransactions = 0;
+                    long totalInputs = 0;
+                    long totalOutputs = 0;
+                    ulong totalOutputSats = 0;
+                    int merkleMismatches = 0;
+
+
+                    MyBlock<BlockRaw>? atBlock = state.blockZero;
+                    int count = 0;
+                    while (atBlock != null)
+                    {
+                        Block parsed = ParseBlock(atBlock.data, atBlock.height);
+                        parsedChain.Add(parsed);
+
+                        foreach (Transaction tx in parsed.Transactions)
+                        {
+                            allTransactions.Add(tx);
+                        }
+
+                        totalTransactions += parsed.Transactions.Count;
+                        foreach (Transaction tx in parsed.Transactions)
+                        {
+                            totalInputs += tx.Inputs.Count;
+                            totalOutputs += tx.Outputs.Count;
+                            foreach (Transaction.TxOutput output in tx.Outputs)
+                            {
+                                totalOutputSats += output.Value;
+                            }
+                        }
+
+                        // Counted rather than thrown on: one bad block should not take the whole run
+                        // down when 119,000 others are fine.
+                        if (!MerkleRootMatches(parsed))
+                        {
+                            merkleMismatches++;
+                            if (merkleMismatches <= 5)
+                            {
+                                Console.WriteLine("merkle mismatch at height " + parsed.header.BlockNumber
+                                                  + " " + parsed.header.Hash);
+                            }
+                        }
+
+                        atBlock = atBlock.nextLink;
+                        if (count++ % 20000 == 0)
+                        {
+                            Console.WriteLine(count + " parsed height " + parsed.header.BlockNumber + " " + parsed.header.Hash);
+                        }
+                    }
+                    parseClock.Stop();
+
+
+
+                    Console.WriteLine("parsed " + parsedChain.Count + " blocks in "
+                                      + parseClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+                    Console.WriteLine("  transactions : " + totalTransactions);
+                    Console.WriteLine("  inputs       : " + totalInputs);
+                    Console.WriteLine("  outputs      : " + totalOutputs);
+                    Console.WriteLine("  output value : " + (totalOutputSats / 100000000.0).ToString("F8") + " BTC");
+                    Console.WriteLine("  merkle roots : " + (parsedChain.Count - merkleMismatches)
+                                      + " of " + parsedChain.Count + " match");
+
+                    var g = allTransactions.Last();
+
+
+
+
+
+
+
+
+
+
+
+
+
+                    Console.WriteLine("total transactions: " + allTransactions.Count);
+
+                    const int segmentBlocks = 25000;
+
+                    MyBlock<BlockRaw>? f = state.blockZero;
+                    int segment = 0;
+                    int totalCopied = 0;
+
+                    while (f != null && segment < 8)
+                    {
+                        segment++;
+
+                        MyBlock<BlockRaw>? head = null;
+                        MyBlock<BlockRaw>? tail = null;
+                        int copied = 0;
+
+                        // Counted, not measured against a height boundary, so a run holds exactly
+                        // segmentBlocks blocks whatever the heights in it happen to be.
+                        while (f != null && copied < segmentBlocks)
+                        {
+                            MyBlock<BlockRaw> copy = new MyBlock<BlockRaw>
+                            {
+                                hash = f.hash,
+                                prevHash = f.prevHash,
+
+                                // Carried over rather than left at its default: height is what the
+                                // rocksdb 'h' keys are built from, so a chain of copies that all
+                                // say zero files every block under height 0, each overwriting the
+                                // last, and the height index ends up holding one entry.
+                                height = f.height,
+
+                                data = f.data,
+                                prevLink = tail,
+                                nextLink = null,
+                            };
+
+                            if (tail == null)
+                            {
+                                head = copy;
+                            }
+                            else
+                            {
+                                tail.nextLink = copy;
+                            }
+
+                            tail = copy;
+                            copied++;
+                            f = f.nextLink;
+                        }
+
+                        totalCopied += copied;
+
+                        // The outer loop only runs while f is non-null, so the inner one always
+                        // copies at least one block and head is set by the time we reach here.
+                        string rocksDbPath = "C:\\btcblock\\rocksdb\\blocks" + segment;
+                        Console.WriteLine("segment " + segment + ": " + copied + " blocks, heights "
+                                          + head!.height + " to " + tail!.height + " -> " + rocksDbPath);
+
+                        var rocksClock = Stopwatch.StartNew();
+                        SaveBlocksToRocksDb(rocksDbPath, head);
+                        rocksClock.Stop();
+
+
+                    }
+
+
+
+                }
+
+
+
+                if(false)
+                {
+
+
+                    string rocksDbBase2 = "C:\\btcblock\\rocksdb\\blocks";
+
+                    var loadedBlocks = LoadBlocks(0, 149999, rocksDbBase2);
+
+                    //var loadedBlocks2 = LoadBlocks(200000, 249999, rocksDbBase2);
+
+
+                    List<AddressBalance>? walletsFromList2 = null;
+
+                    // load all transactions from ~6 gigabyte  sqllite file transactions_all.db
+                    //
+                    // The file the last run left behind - SaveAllTransactionsToSqlite writes it at the
+                    // end of the balance walk - read back whole. What comes out is not what went in:
+                    // the database holds a txid, a locator and one row per side of every transaction,
+                    // with the address and value already resolved on both sides, and no scripts, no
+                    // outpoints and no block bytes. So this rebuilds StoredTransaction rather than
+                    // Transaction, which is the honest shape of what is in there.
+                    //
+                    // Worth having because resolving inputs is the expensive half of everything below.
+                    // An input names an outpoint and no address, so attributing one means carrying the
+                    // UTXO set of the whole chain and looking it up - which the run that wrote this
+                    // file already did, once, and filed the answers. Reading them back is a single
+                    // sequential pass over the file with nothing held but the result.
+                    const int dbHeights = 50000;//200000;
+
+                    string allTxDbPath = "C:\\btcblock\\rocksdb\\transactions_all.db";
+
+                    //List<StoredTransaction> storedTransactions =
+                    //LoadAllTransactionsFromSqlite(allTxDbPath, dbHeights);
+
+                    // 7 million transactions in first 200,000 blocks
+
+                    //int64 9x10^18  all sats is 21x10^ 14 (6+8)
+
+                    // And the balances straight off them, which is the third way this file arrives at
+                    // that table: once from the blocks, once from the collected transactions, and now
+                    // once from the database. CompareAddressBalances further down holds this against
+                    // the block walk - the same several million addresses, reached by routines with no
+                    // code in common, is what says the database is a faithful copy of the chain.
+                    //
+                    // null rather than a path because the CSV is another 350 MB and the two already
+                    // written say the same thing; pass a path to have it out.
+                    //walletsFromList2 = CollectAddressBalancesFromStoredTransactions(storedTransactions,dbHeights, null);
+
+                    // silk road  1933phfhK3ZgFQNLGSDXvqCn32k2buXY8a
+                    // mount gox 1FeexV6bAHb8ybZjqQMjJrcCrHGW9sb6uF
+
+                    List<Transaction> allTransactions = new List<Transaction>();
+
+                    int count = 0;
+
+                    foreach (BlockRaw raw in loadedBlocks)
+                    {
+                        Block parsed = ParseBlock(raw, raw.BlockIndex);
+
+                        // Moved out of the inner loop, where it added the block's whole list once per
+                        // transaction in it - so a block of n transactions put n*n of them in here.
+                        // Anything counting balances off the result credited every output n times.
+                        allTransactions.AddRange(parsed.Transactions);
+
+                        foreach (Transaction tx in parsed.Transactions)
+                        {
+                            if (count++ % 500000 == 0)
+                            {
+                                Console.WriteLine(tx.GetHashAsString());
+                                //tx.
+                            }
+
+                        }
+                    }
+
+                    Console.WriteLine("allTransactions " + allTransactions.Count);
+
+                    // 5000 transactions per block  1,000,000 blocks is 5 billion transactions at 500 bytes each, which is 2.5 TB of data. 
+
+
+                    List<KeyValuePair<int, simpleTransaction[]>> simpleTransactionsList = new List<KeyValuePair<int, simpleTransaction[]>>();
+                    int[] simpleTransactionsListCounts = new int[MAXLISTSsimpleTransactionsList];
+
+                    int i = 0;
+                    while (i < MAXLISTSsimpleTransactionsList)
+                    {
+                        simpleTransaction[] simpleTransactionsMillion = new simpleTransaction[MAXSIZEsimpleTransactionsList];
+                        simpleTransactionsList.Add(new KeyValuePair<int, simpleTransaction[]>(i, simpleTransactionsMillion));
+                        simpleTransactionsListCounts[i] = 0;
+                        i++;
+                    }
+
+                    SortedList<long, string> lookupAddress = new SortedList<long, string>();
+
+
+                    // The balances out of allTransactions rather than out of the blocks. Nothing is
+                    // parsed again - the list above already holds every transaction, in chain order,
+                    // each with its height stamped on it by ParseBlock on the way past.
+                    //
+                    // What this way costs is memory rather than time. The block walk further down
+                    // holds one parsed block at a time and lets it go; this holds every transaction
+                    // of 200,000 blocks at once, inputs, outputs, scripts and all, on top of the raw
+                    // block bytes that `loadedBlocks` is already keeping. If it runs out of room, the block
+                    // walk arrives at the same table without the list.
+                    //
+                    // Declared out here so the comparison at the end of the block walk can still find
+                    // it, and null when this has been switched off, which is what that check is for.
+                    List<AddressBalance>? walletsFromList = null;
+                    {
+                        const int listHeights = 200000;
+
+                        string listCsvPath = "C:\\btcblock\\rocksdb\\address_balances_from_list.csv";
+
+                        var listClock = Stopwatch.StartNew();
+                        walletsFromList = CollectAddressBalancesFromTransactions(allTransactions, listHeights,
+                                                                                listCsvPath, simpleTransactionsList,
+                                                                                simpleTransactionsListCounts, lookupAddress);
+                        listClock.Stop();
+
+                        Console.WriteLine("  total        : " + listClock.Elapsed.TotalSeconds.ToString("F1")
+                                          + "s including the sort and the file");
+                    }
+
+
+                    var t3 = simpleTransactionsList.ToArray();
+                    var s = simpleTransactionsListCounts.ToArray();
+
+                    for (int i2 = 0; i2 < MAXLISTSsimpleTransactionsList; i2++)
+                    {
+                        simpleTransaction.saveToDisk("C:\\btcblock\\rocksdb\\simpletx\\OneToSixSet", i2, simpleTransactionsList[i2].Value, simpleTransactionsListCounts[i2]);
+                    }
+
+
+                    saveLookupAddress(lookupAddress, "C:\\btcblock\\rocksdb\\addresslookup1.dat");
+
+
+                    SortedList<long, string> lookupAddress2 = loadLookupAddress("C:\\btcblock\\rocksdb\\addresslookup1.dat");
+
+                }
+                { 
+                    List<KeyValuePair<int, simpleTransaction[]>> simpleTransactionsList = new List<KeyValuePair<int, simpleTransaction[]>>();
+                    //int[] simpleTransactionsListCounts = new int[MAXLISTSsimpleTransactionsList];
+
+                    for (int i2 = 0; i2 < 2; i2++)
+                    {
+                        simpleTransactionsList.Add(new KeyValuePair<int, simpleTransaction[]>(i2,
+                            simpleTransaction.loadFromDisk("C:\\btcblock\\rocksdb\\simpletx\\One_to_SevenSet", i2)));
+                    }
+
+                    simpleTransaction g = new simpleTransaction();
+                    long h = g.shrinkStringAddress("1L7i2sEamwB6SzZzn9JQf2Rz5XB4AcAMfP");
+
+
+
+
+                    SortedList<long, string> lookupAddress2 = loadLookupAddress("C:\\btcblock\\rocksdb\\simpletx\\addresslookup1.dat");
+
+                    // The shrunk key back to the string it came from, for printing only.
+                    //
+                    // A miss is not a bug and not rare. The table holds what addLookupAddress was
+                    // handed while the records were being built, which is the addresses that could
+                    // be read off a script - so an end of a payment that was never named, or one
+                    // whose records came from a run before the table existed, has nothing to find
+                    // here. The number is still the identity either way, so a miss prints it.
+                    //
+                    // Zero is left to fall through to that on purpose. It reads as "no address at
+                    // all" - a coinbase's From, a script nobody can name - and also as the burn
+                    // address 1111111111111111111114oLvT2, whose hash160 is twenty zero bytes.
+                    // Nothing here can tell those apart, so it says so rather than picking one.
+                    string nameOf(long shrunk)
+                    {
+                        if (lookupAddress2.TryGetValue(shrunk, out string? name))
+                        {
+                            return name;
+                        }
+
+                        if (shrunk == 0)
+                        {
+                            return "0 (no address, or the burn address - not told apart)";
+                        }
+
+                        return shrunk + " (not in the lookup)";
+                    }
+
+
+
+
+
+
+                    // Every slot of every array is a record, so there is no count to walk to the
+                    // way the save side needed simpleTransactionsListCounts: loadFromDisk sizes the
+                    // array from the file length, and a file holds exactly what was written to it.
+                    // Worth saying up front whether the address being looked for is one the table
+                    // knows, because a scan that finds nothing has two very different causes and
+                    // this tells them apart: an address with no payments in these two files, or an
+                    // address whose key was never built the same way these records' keys were.
+                    Console.WriteLine("scanning for 1L7i2sEamwB6SzZzn9JQf2Rz5XB4AcAMfP -> " + h
+                                      + (lookupAddress2.ContainsKey(h) ? ", in the lookup"
+                                                                       : ", NOT in the lookup")
+                                      + " (" + lookupAddress2.Count + " addresses)");
+
+                    int found = 0;
+                    long sentTotal = 0;
+                    long receivedTotal = 0;
+
+                    foreach (KeyValuePair<int, simpleTransaction[]> file in simpleTransactionsList)
+                    {
+                        simpleTransaction[] records = file.Value;
+
+                        for (int r = 0; r < records.Length; r++)
+                        {
+                            simpleTransaction t = records[r];
+
+                            // One record is one From-to-To payment, so this address can be on
+                            // either end of it - and on both, which is what a payment back to
+                            // itself looks like once the change output is written down this way.
+                            bool sent = t.From == h;
+                            bool received = t.To == h;
+
+                            if (!sent && !received)
+                            {
+                                continue;
+                            }
+
+                            int height;
+                            long amount = t.splitAMountAndBLock(t.AmountAndBlock, out height);
+
+                            string direction;
+                            long other;
+                            if (sent && received)
+                            {
+                                direction = "self    ";
+                                other = h;
+                            }
+                            else if (sent)
+                            {
+                                direction = "sent    ";
+                                other = t.To;          // the end that is not this address
+                                sentTotal += amount;
+                            }
+                            else
+                            {
+                                direction = "received";
+                                other = t.From;
+                                receivedTotal += amount;
+                            }
+
+                            // Satoshis to BTC as decimal rather than double: eight places of a
+                            // hundred-millionth is past what double holds exactly, and a balance
+                            // printed a satoshi out is the kind of wrong that gets believed.
+                            Console.WriteLine("  file " + file.Key + " record " + r.ToString("D7")
+                                              + "  block " + height.ToString("D6")
+                                              + "  " + direction
+                                              + " " + (amount / 100000000m).ToString("F8") + " BTC"
+                                              + "  " + (sent && received ? "with " : sent ? "to   " : "from ")
+                                              + nameOf(other));
+                            found++;
+                        }
+                    }
+
+                    Console.WriteLine(found + " records: " + (receivedTotal / 100000000m).ToString("F8")
+                                      + " BTC in, " + (sentTotal / 100000000m).ToString("F8")
+                                      + " BTC out, balance "
+                                      + ((receivedTotal - sentTotal) / 100000000m).ToString("F8") + " BTC");
+
+                    // Every payment in both files applied to a running balance per address. Same
+                    // walk as the scan above with the filter taken off: To is credited, From is
+                    // debited, and what is left against a key is what that address holds across
+                    // the records loaded here.
+                    //
+                    // A Dictionary rather than the SortedList this file's lookup table uses,
+                    // because this one is built by accumulation rather than by lookup - the same
+                    // busy address is hit thousands of times - and an O(1) hash beats a binary
+                    // search followed by an O(n) array shift every time a new address turns up.
+                    // Sorted order is wanted once, at the end, and is paid for there instead.
+                    var balances = new Dictionary<long, long>(1 << 20);
+
+                    long payments = 0;
+
+                    foreach (KeyValuePair<int, simpleTransaction[]> file in simpleTransactionsList)
+                    {
+                        foreach (simpleTransaction t in file.Value)
+                        {
+                            int atHeight;
+                            long moved = t.splitAMountAndBLock(t.AmountAndBlock, out atHeight);
+
+                            // GetValueRefOrAddDefault rather than TryGetValue and then an assign:
+                            // one hash of the key rather than two, on a loop that runs twice per
+                            // record over every record in the set.
+                            //
+                            // The ref it hands back is into the dictionary's own storage, so it
+                            // dies the moment anything adds another key - which is what the very
+                            // next statement does. Hence each one used and finished with before
+                            // the other is asked for, rather than both taken up front.
+                            ref long credit = ref System.Runtime.InteropServices.CollectionsMarshal
+                                                    .GetValueRefOrAddDefault(balances, t.To, out _);
+                            credit += moved;
+
+                            ref long debit = ref System.Runtime.InteropServices.CollectionsMarshal
+                                                   .GetValueRefOrAddDefault(balances, t.From, out _);
+                            debit -= moved;
+
+                            payments++;
+                        }
+                    }
+
+                    Console.WriteLine();
+                    Console.WriteLine(payments + " payments over " + balances.Count + " addresses");
+
+                    // The same address counted two different ways: the scan above filtered for h
+                    // and totalled what it saw, this one totalled everything and then looked h up.
+                    // They can only disagree if one of them is wrong, so it is worth one line to
+                    // find that out rather than trusting both.
+                    long fromScan = receivedTotal - sentTotal;
+                    long fromTable = balances.TryGetValue(h, out long held) ? held : 0;
+
+                    Console.WriteLine("  cross check on " + h + ": scan says "
+                                      + (fromScan / 100000000m).ToString("F8") + ", table says "
+                                      + (fromTable / 100000000m).ToString("F8")
+                                      + (fromScan == fromTable ? "   (agree)" : "   <-- DISAGREE"));
+
+                    // Key zero is not a wallet and is taken out before the figures below. A
+                    // coinbase has no From, so every block's reward debits zero and what collects
+                    // there is the amount minted rather than anything anybody holds - with whatever
+                    // the burn address 1111111111111111111114oLvT2 was paid mixed in, since the two
+                    // share this key. Printed on its own line because it is worth seeing, not
+                    // because it means what the other rows mean.
+                    if (balances.Remove(0, out long notAWallet))
+                    {
+                        Console.WriteLine("  key 0, minted and burned together, not a wallet: "
+                                          + (notAWallet / 100000000m).ToString("F8") + " BTC");
+                    }
+
+                    // Negative balances are expected and are not an arithmetic fault: only two of
+                    // the seven files are loaded, so an address whose incoming payments live in one
+                    // of the other five is caught spending money it was never seen receiving. The
+                    // count is how much of this set is being read through that hole.
+                    int negative = 0;
+                    long positiveTotal = 0;
+
+                    foreach (long balance in balances.Values)
+                    {
+                        if (balance < 0)
+                        {
+                            negative++;
+                        }
+                        else
+                        {
+                            positiveTotal += balance;
+                        }
+                    }
+
+                    Console.WriteLine("  " + negative + " addresses negative (funded by a file not"
+                                      + " loaded here), " + (balances.Count - negative)
+                                      + " at or above zero holding "
+                                      + (positiveTotal / 100000000m).ToString("F8") + " BTC");
+
+                    // One full sort of the table to answer one question. Cheaper than it sounds
+                    // next to the walk that built it, and simpler than carrying a heap of the top
+                    // twenty five through the accumulation - which is the change to make if this
+                    // ever runs over all seven files rather than two.
+                    const int TopWallets = 25;
+
+                    Console.WriteLine();
+                    Console.WriteLine("top " + TopWallets + " by balance:");
+
+                    foreach (KeyValuePair<long, long> wallet in balances
+                                                               .OrderByDescending(w => w.Value)
+                                                               .Take(TopWallets))
+                    {
+                        Console.WriteLine("  " + (wallet.Value / 100000000m).ToString("F8").PadLeft(18)
+                                          + " BTC  " + nameOf(wallet.Key));
+                    }
+
+                    
+                }
+            }
+
+
+
+
+            //https://www.blockchain.com/explorer/addresses/BTC/1GoLDuG1MMwvAhSzwJigNyThnmAzt98RCW
+            // address with 400 transactions 1GoLDuG1MMwvAhSzwJigNyThnmAzt98RCW, 2/26/2014, 23:45:38 last transaction hash 300cafc07578688e5a31fc0051e20696a3e29a351a2c144576920163eb44823c
             return 0;
         }
+
+        public const int MAXLISTSsimpleTransactionsList = 10;
+        public const int MAXSIZEsimpleTransactionsList = 5000000;
+
+
+
+        /// <summary>
+        /// A transaction cut down to twenty four bytes: who paid, who was paid, how much, and
+        /// where in the chain it happened.
+        ///
+        /// What that buys is the whole of the early chain in memory at once. The database this
+        /// shrinks from holds thirty million address rows and takes about three gigabytes to load;
+        /// the same rows at twenty four bytes each are seven hundred megabytes on disk. What it
+        /// costs is everything the bytes no longer say - no txid, no script, no locator back to
+        /// the block, and an address truncated to eight bytes that cannot be turned back into a
+        /// string.
+        ///
+        /// In memory it is not twenty four bytes, because this is a class: thirty million of them
+        /// is thirty million objects at sixteen bytes of header plus the twenty four of fields,
+        /// and an array of eight byte references pointing at them - about 1.4 GB rather than the
+        /// 700 MB on disk. As a struct it would be the disk figure exactly, the array would be one
+        /// allocation the collector never looks inside, and saveToDisk could hand the whole array
+        /// to the file in one call through MemoryMarshal instead of packing it a record at a time.
+        /// Changing that is a one word edit here and nothing at the call sites, since every method
+        /// below already treats a record as a value.
+        ///
+        /// So this is an index to answer questions with, not a record to rebuild anything from:
+        /// which addresses touched each other, how much moved and when. Anything else means going
+        /// back to the database or the blocks.
+        ///
+        /// One instance is one payment - one From to one To - not one Bitcoin transaction, which
+        /// has as many inputs and outputs as it likes. How a transaction with three inputs and two
+        /// outputs turns into these is the caller's decision and not one this class makes: six
+        /// records for every from-to pair, or five with one end left at zero. The chain itself does
+        /// not say which input paid which output.
+        /// </summary>
+        public class simpleTransaction
+        {
+            public Int64 From;
+            public Int64 AmountAndBlock; // amount in satoshis upper 40 bits, block height in the smallest 24 bits
+            public Int64 To;
+
+            /// <summary>Bits at the bottom of AmountAndBlock holding the height. 24 of them reach
+            /// block 16,777,215, which at ten minutes a block is somewhere past the year 2330.</summary>
+            public const int BlockHeightBits = 2; // 24 ,  adds to 64 with below
+
+            /// <summary>Bits above those holding the amount.</summary>
+            public const int AmountBits = 61; // 40 , adds to 64 with above
+
+            /// <summary>The highest block this can pack: 16,777,215.</summary>
+            public const int MaxBlockHeight = (1 << BlockHeightBits) - 1;
+
+            /// <summary>The largest amount this can pack: 1,099,511,627,775 satoshis, which is
+            /// 10,995.11627775 BTC. Not the ~5,500 the field comment guessed - that is 2^39, and
+            /// the field is 2^40 wide - and not nearly the whole of what the chain contains. See
+            /// computeAmountAndBlock.</summary>
+            public const Int64 MaxAmountSatoshis = (1L << AmountBits) - 1;
+
+            /// <summary>What one of these occupies on disk, and what its three fields occupy in
+            /// memory. The file format is the fields, in order, and nothing else.</summary>
+            public const int RecordBytes = 24;
+
+            const Int64 BlockHeightMask = (1L << BlockHeightBits) - 1;
+
+            /// <summary>Where saveToDisk and loadFromDisk put their files. The one knob either of
+            /// them has - fileIndex only names the file inside it.</summary>
+
+            /// <summary>
+            /// An address shrunk to eight bytes, given as a string.
+            ///
+            /// Two forms are taken, told apart by length rather than by guesswork: 40 or 50
+            /// characters is hex - the hash160 on its own, or the whole version-hash-checksum
+            /// payload - and anything else is a base58 address, which runs 26 to 35 characters and
+            /// so can never be either of those lengths. A base58 string has its checksum verified
+            /// on the way through, which costs two SHA-256s per call; hex is not checked because
+            /// there is nothing in it to check.
+            /// </summary>
+            public Int64 shrinkStringAddress(string addressHexString)
+            {
+                if (addressHexString == null)
+                {
+                    throw new ArgumentNullException(nameof(addressHexString));
+                }
+
+                if (addressHexString.Length == 40 || addressHexString.Length == 50)
+                {
+                    return shrinkByteAddress(Convert.FromHexString(addressHexString));
+                }
+
+                return shrinkByteAddress(Base58CheckDecode(addressHexString));
+            }
+
+            /// <summary>
+            /// An address shrunk to eight bytes: the LAST eight of its hash160, read big endian so
+            /// the number prints as the tail of the hash reads. Which end is not arbitrary and is
+            /// the whole substance of this method - see below.
+            ///
+            /// Truncating a hash needs no hashing of its own, and the theory says any eight bytes
+            /// of a hash160 are as good as any other eight: it is already uniform, and the birthday
+            /// bound over 64 bits makes a collision anywhere in 6.6 million addresses about a one
+            /// in a million event. The theory is wrong about this chain, and the ends of the hash
+            /// are not interchangeable. Counted over the 6,576,582 addresses of the first 200,000
+            /// blocks:
+            ///
+            ///     first 8 bytes       101 collisions
+            ///     middle 8 bytes       30
+            ///     last 8 bytes         12
+            ///
+            /// Because a fair share of those addresses were never hashed from anything. They are
+            /// vanity and message addresses - 11ConsecteturAdipiscingE1itYQHEPM,
+            /// 11EtchabLockdotcomXXXXXXXXXXzmeuk, 1111111111111111111114oLvT2 - where somebody
+            /// picked the base58 string and let the bytes fall out of it. Base58 is a big endian
+            /// numeral system, so fixing the front of the string fixes the front of the payload:
+            /// every address beginning "11Consectetur" shares its leading bytes by construction,
+            /// and seven of them share all eight. The filler at the end is where those addresses
+            /// differ, which is why the tail is the eight bytes to take.
+            ///
+            /// The twelve that still collide are mostly the same thing from the other end. One is
+            /// not: 175tWpb8K1S7NmH4Zx6rewF9WQrcZv2456 and 37muSN5ZrukVTvyVh3mT5Zc5ew9L9CBare are
+            /// the same hash160 - 42bd6b9eeb1da01504fefe014e16415246c0f66f - under two version
+            /// bytes, one paying a public key hash and one paying a script hash. No truncation can
+            /// separate those, because nothing but the version byte differs, and the version byte
+            /// is not mixed in here: a bare hash160 arrives without one, and mixing it would make
+            /// the 20 byte form disagree with the 21 and 25 byte forms of the same address.
+            ///
+            /// It is a one way trip. The other twelve bytes are gone, so nothing here can be turned
+            /// back into an address - keep the strings elsewhere if they are wanted.
+            ///
+            /// Half of these are negative, which is nothing to worry about: the number is an
+            /// identity and never an amount. Zero is worth knowing about. It reads naturally as "no
+            /// address at all" - a coinbase's From, a script nobody can name - and no address
+            /// reaches it by chance, but one address in this data reaches it on purpose:
+            /// 1111111111111111111114oLvT2, whose hash160 is twenty zero bytes, is the burn address
+            /// everybody's unspendable coins go to. It appears in the first 200,000 blocks. So a
+            /// zero either means nothing was there or means that address, and anything that has to
+            /// tell them apart needs a flag of its own.
+            ///
+            /// Takes the hash160 on its own (20 bytes), with its version byte (21), or the whole
+            /// base58 payload with the checksum still on it (25).
+            /// </summary>
+            public Int64 shrinkByteAddress(byte[] addressBytes)
+            {
+                if (addressBytes == null)
+                {
+                    throw new ArgumentNullException(nameof(addressBytes));
+                }
+
+                int hash160;
+                if (addressBytes.Length == 20)
+                {
+                    hash160 = 0;
+                }
+                else if (addressBytes.Length == 21 || addressBytes.Length == 25)
+                {
+                    hash160 = 1;
+                }
+                else
+                {
+                    throw new ArgumentException("an address is 20 bytes of hash160, 21 with its"
+                                                + " version byte or 25 with the checksum as well,"
+                                                + " and this is " + addressBytes.Length,
+                                                nameof(addressBytes));
+                }
+
+                // The last eight bytes of the hash160, not the last eight of what was passed in -
+                // on a 25 byte payload those would be four bytes of hash and the four byte
+                // checksum, which is a different key for the same address depending on which form
+                // it arrived in.
+                return BinaryPrimitives.ReadInt64BigEndian(addressBytes.AsSpan(hash160 + 12, 8));
+            }
+
+            /// <summary>
+            /// The two halves of AmountAndBlock taken back apart: the height out of the bottom 24
+            /// bits, the amount returned out of the top 40.
+            ///
+            /// Shifted unsigned rather than arithmetic. A value this class packed never has bit 63
+            /// set, so the two agree on anything computeAmountAndBlock made - but on a field that
+            /// was never packed, or was read off a corrupted file, an arithmetic shift hands back a
+            /// negative amount and a signed one hands back a large positive number that is at least
+            /// obviously wrong.
+            /// </summary>
+            public Int64 splitAMountAndBLock(Int64 combinedAmountAndBlock, out int blockHeight)
+            {
+                blockHeight = (int)(combinedAmountAndBlock & BlockHeightMask);
+                return combinedAmountAndBlock >>> BlockHeightBits;
+            }
+
+            /// <summary>
+            /// The amount and the height packed into one Int64, the inverse of splitAMountAndBLock.
+            ///
+            /// The limits are exact and both were one out as first written. `2 &lt;&lt; 23` is 2^24,
+            /// which is one past the largest height 24 bits hold, so a height of exactly 16,777,216
+            /// went through and spilled into bit 24 - into the bottom of the amount. `2 &lt;&lt; 39`
+            /// is 2^40 and let one satoshi too many into a 40 bit field the same way. Hence
+            /// MaxBlockHeight and MaxAmountSatoshis, and hence &gt; rather than &gt;=.
+            ///
+            /// The amount limit is the real constraint on this format, and 40 bits is not enough
+            /// for the chain it is being pointed at. It reaches 10,995.11627775 BTC; the first
+            /// 200,000 blocks contain 30,506 address rows above that, 15,269 of them outputs, and
+            /// the largest single output in the range is the 500,000 BTC moved in block 153,509 -
+            /// 50,000,000,000,000 satoshis, which needs 46 bits. Bitcoin's whole supply needs 51.
+            /// So this throws on about one row in a thousand of that database, which is a choice to
+            /// make rather than a bug: widen the amount to 46 bits and the height to 18 (which then
+            /// only reaches block 262,143), keep 40/24 and hold the outliers somewhere else, or
+            /// move to a wider record.
+            /// </summary>
+            public Int64 computeAmountAndBlock(Int64 amountSatoshis, int blockHeight)
+            {
+                if (blockHeight > MaxBlockHeight)
+                {
+                    throw new Exception("block height too high: " + blockHeight + " needs more than "
+                                        + BlockHeightBits + " bits, which stop at " + MaxBlockHeight);
+                }
+                if (amountSatoshis > MaxAmountSatoshis) // supports up to ~10,995 BTC
+                {
+                    throw new Exception("Amount too high: " + amountSatoshis + " satoshis needs more"
+                                        + " than " + AmountBits + " bits, which stop at "
+                                        + MaxAmountSatoshis + " (" + MaxAmountSatoshis / 100000000
+                                        + " BTC)");
+                }
+
+                // Neither is allowed to be negative, and not only because the arithmetic below
+                // would carry the sign bits into the other field. A negative height or a negative
+                // amount is a bug upstream, and one that silently packs is one found much later.
+                if (blockHeight < 0)
+                {
+                    throw new Exception("block height is negative: " + blockHeight);
+                }
+                if (amountSatoshis < 0)
+                {
+                    throw new Exception("Amount is negative: " + amountSatoshis + " satoshis");
+                }
+
+                return (amountSatoshis << BlockHeightBits) | (Int64)blockHeight;
+            }
+
+            /// <summary>
+            /// An array of these written to one file, as the fields and nothing else: From,
+            /// AmountAndBlock, To, each eight bytes little endian, twenty four bytes a record,
+            /// repeated. No header, no count, no padding - the file's length divided by twenty four
+            /// is how many are in it, which is what loadFromDisk relies on.
+            ///
+            /// fileIndex only names the file. What it segments is the caller's business - one per
+            /// blk file, one per fifty thousand blocks, one per run - and nothing here reads it
+            /// back out of the contents, so a file loaded under the wrong index still loads.
+            ///
+            /// maxIndex is a count rather than an index, despite the name: it is one past the last
+            /// record, so array.Length writes the whole array and 0 writes an empty file. The array
+            /// is allocated at its full size and filled from the front, so every slot at or above
+            /// maxIndex is a null the caller never assigned. Writing those is a
+            /// NullReferenceException at best and a file full of zero records at worst, and it is
+            /// the whole reason this takes the parameter.
+            ///
+            /// The file is opened FileMode.Create, so a run that writes fewer records than the last
+            /// one leaves a shorter file rather than the tail of the old one behind the new ones.
+            ///
+            /// Written through one buffer of four thousand records rather than a BinaryWriter call
+            /// per field, which is three system calls per record against one per hundred kilobytes.
+            /// </summary>
+            public static void saveToDisk(string savePath, int fileIndex, simpleTransaction[] array, int maxIndex)
+            {
+                if (array == null)
+                {
+                    throw new ArgumentNullException(nameof(array));
+                }
+
+                if (maxIndex < 0 || maxIndex > array.Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(maxIndex), maxIndex,
+                                                          "there are " + array.Length + " slots to"
+                                                          + " write from, so a count outside 0 to"
+                                                          + " that is the caller's count and the"
+                                                          + " caller's array disagreeing");
+                }
+
+                Directory.CreateDirectory(savePath);
+                string path = PathForIndex(savePath, fileIndex);
+
+                byte[] buffer = new byte[RecordBytes * 4096];
+                int at = 0;
+
+                using var file = new FileStream(path, FileMode.Create, FileAccess.Write,
+                                                FileShare.None, 1 << 20);
+
+                for (int i = 0; i < maxIndex; i++)
+                {
+                    simpleTransaction record = array[i];
+
+                    // A null below maxIndex is the same disagreement as an out of range maxIndex,
+                    // only found one record at a time. Worth saying so: the alternative is the
+                    // NullReferenceException the next line throws on its own, which names neither
+                    // the slot nor the count it was supposed to be under.
+                    if (record == null)
+                    {
+                        throw new InvalidDataException("slot " + i + " of the " + maxIndex
+                                                       + " to write was never filled in");
+                    }
+
+                    BinaryPrimitives.WriteInt64LittleEndian(buffer.AsSpan(at, 8), record.From);
+                    BinaryPrimitives.WriteInt64LittleEndian(buffer.AsSpan(at + 8, 8), record.AmountAndBlock);
+                    BinaryPrimitives.WriteInt64LittleEndian(buffer.AsSpan(at + 16, 8), record.To);
+                    at += RecordBytes;
+
+                    if (at == buffer.Length)
+                    {
+                        file.Write(buffer, 0, at);
+                        at = 0;
+                    }
+                }
+
+                if (at > 0)
+                {
+                    file.Write(buffer, 0, at);
+                }
+            }
+
+            /// <summary>
+            /// The file back as an array, in the order it was written.
+            ///
+            /// A file whose length is not a whole number of records is a truncated write or another
+            /// format altogether, and either way nothing after the break can be read - so it throws
+            /// rather than returning the records up to it.
+            ///
+            /// ReadExactly rather than Read: a FileStream is allowed to hand back fewer bytes than
+            /// were asked for, and a loop that assumes otherwise reads a shifted file and finds
+            /// nothing wrong with it.
+            /// </summary>
+            public static simpleTransaction[] loadFromDisk(string loadPath, int fileIndex)
+            {
+                string path = PathForIndex(loadPath, fileIndex);
+                if (!File.Exists(path))
+                {
+                    throw new FileNotFoundException("there is no transaction file at " + path, path);
+                }
+
+                using var file = new FileStream(path, FileMode.Open, FileAccess.Read,
+                                                FileShare.Read, 1 << 20);
+
+                long length = file.Length;
+                if (length % RecordBytes != 0)
+                {
+                    throw new InvalidDataException(path + " is " + length + " bytes, which is not a"
+                                                   + " whole number of " + RecordBytes + " byte"
+                                                   + " records - it is truncated, or it is not one"
+                                                   + " of these files");
+                }
+
+                var loaded = new simpleTransaction[length / RecordBytes];
+
+                byte[] buffer = new byte[RecordBytes * 4096];
+                int done = 0;
+
+                while (done < loaded.Length)
+                {
+                    int want = loaded.Length - done;
+                    if (want > 4096)
+                    {
+                        want = 4096;
+                    }
+
+                    file.ReadExactly(buffer, 0, want * RecordBytes);
+
+                    for (int i = 0; i < want; i++)
+                    {
+                        int at = i * RecordBytes;
+
+                        var record = new simpleTransaction();
+                        record.From = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(at, 8));
+                        record.AmountAndBlock = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(at + 8, 8));
+                        record.To = BinaryPrimitives.ReadInt64LittleEndian(buffer.AsSpan(at + 16, 8));
+
+                        loaded[done + i] = record;
+                    }
+
+                    done += want;
+                }
+
+                return loaded;
+            }
+
+            /// <summary>The file one index names, five digits so they sort the way they are
+            /// numbered - the same shape as the blk files this all came out of.</summary>
+            static string PathForIndex(string path, int fileIndex)
+            {
+                return Path.Combine(path, "simpletx" + fileIndex.ToString("D5") + ".dat");
+            }
+        }
+
+
+
+        /// <summary>Blocks in one rocksdb store, fixed by the writer that fills them.</summary>
+        const int BlocksPerStore = 25000;
+
+        /// <summary>What the stores are called under the base directory, numbered from 1.</summary>
+        const string StorePrefix = "blocks";
+
+        /// <summary>Where the stores live when the caller does not say.</summary>
+        const string DefaultStoreDirectory = "C:\\btcblock\\rocksdb";
+
+        /// <summary>
+        /// A run of blocks out of the rocksdb stores, in height order, as the same BlockRaw
+        /// objects a blk file produces.
+        ///
+        /// The stores are written a fixed 50,000 blocks at a time from height 0 up, so a height
+        /// says which store holds it and no index is needed to find out:
+        ///
+        ///     blocks1  0       to 49999
+        ///     blocks2  50000   to 99999
+        ///     blocks3  100000  to 149999
+        ///     blocks4  150000  to 199999
+        ///
+        /// which is why the range has to land on those boundaries - a store is opened whole or
+        /// not at all. Asking for less than everything is the point of saying so: the first store
+        /// is 14 MB and the fourth is 1.9 GB, and a caller that only wants the early chain has no
+        /// reason to wait for the rest of it.
+        ///
+        /// That mapping is an assumption about the data rather than something the store records:
+        /// the writer counts blocks, not heights, so a chain with a gap in it would put store 3
+        /// somewhere other than height 100000. Everything downstream - the UTXO set, the balances,
+        /// the from-addresses in the SQLite index - is silently wrong rather than noisily broken if
+        /// the blocks are not exactly the run they claim to be, so this ends by checking that what
+        /// came back is the range that was asked for and that every block's parent is the block
+        /// before it. A break in either throws rather than returning something that looks fine.
+        /// </summary>
+        /// <param name="startHeight">First height wanted. Must be the first height of a store, so
+        /// a multiple of 50000.</param>
+        /// <param name="lastHeight">Last height wanted, inclusive. Must be the last height of a
+        /// store, so one less than a multiple of 50000 - 49999, 99999, and so on.</param>
+        /// <param name="baseDirectory">Directory the numbered stores sit in. Empty for the usual
+        /// place.</param>
+        public static List<BlockRaw> LoadBlocks(int startHeight, int lastHeight, string baseDirectory)
+        {
+            if (startHeight < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(startHeight),
+                    "startHeight cannot be negative - got " + startHeight);
+            }
+
+            if (startHeight % BlocksPerStore != 0)
+            {
+                throw new ArgumentException("startHeight must be the first height of a store, so a"
+                    + " multiple of " + BlocksPerStore + " - got " + startHeight, nameof(startHeight));
+            }
+
+            if ((lastHeight + 1) % BlocksPerStore != 0)
+            {
+                throw new ArgumentException("lastHeight must be the last height of a store, so one"
+                    + " less than a multiple of " + BlocksPerStore + " (" + (BlocksPerStore - 1)
+                    + ", " + (BlocksPerStore * 2 - 1) + ", and so on) - got " + lastHeight,
+                    nameof(lastHeight));
+            }
+
+            if (lastHeight < startHeight)
+            {
+                throw new ArgumentException("lastHeight " + lastHeight + " is below startHeight "
+                    + startHeight, nameof(lastHeight));
+            }
+
+            string directory = baseDirectory;
+            if (string.IsNullOrWhiteSpace(directory))
+            {
+                directory = DefaultStoreDirectory;
+            }
+
+            // The whole of the height-to-store mapping, and the reason the two arguments have to
+            // land on store boundaries.
+            int firstStore = startHeight / BlocksPerStore + 1;
+            int lastStore = (lastHeight + 1) / BlocksPerStore;
+            int stores = lastStore - firstStore + 1;
+            int expected = lastHeight - startHeight + 1;
+
+            // Named up front so the loop below and the error path agree on where a store lives.
+            var storePaths = new string[stores];
+            for (int i = 0; i < stores; i++)
+            {
+                storePaths[i] = Path.Combine(directory, StorePrefix + (firstStore + i));
+            }
+
+            // Checked before any of them is opened, so a range that reaches past what was written
+            // says which store is missing instead of half-loading and failing the count at the
+            // end. The writer stops at four stores, so anything above height 199999 lands here.
+            foreach (string storePath in storePaths)
+            {
+                if (!Directory.Exists(storePath))
+                {
+                    throw new DirectoryNotFoundException("no rocksdb store at " + storePath
+                        + " - heights " + startHeight + " to " + lastHeight + " need stores "
+                        + firstStore + " to " + lastStore);
+                }
+            }
+
+            Console.WriteLine("rocksdb      : heights " + startHeight + " to " + lastHeight
+                              + " from " + stores + " store(s), " + StorePrefix + firstStore
+                              + " to " + StorePrefix + lastStore);
+
+            var loadClock = Stopwatch.StartNew();
+
+            // One store per thread. They are separate databases in separate directories sharing
+            // no handle, and LoadBlocksFromRocksDb keeps everything it touches local - its list,
+            // its options, its RocksDb and its iterator are all created inside the call. So the
+            // only thing crossing threads is the array each result is dropped into, and every task
+            // owns one slot of it.
+            //
+            // Worth doing because most of the cost is not the disk: every block is re-hashed on
+            // the way out to check it against the hash it is filed under, which is CPU work that
+            // scales rather than queueing behind one disk head.
+            var perStore = new List<BlockRaw>[stores];
+            var summary = new string[stores];
+
+            try
+            {
+                Parallel.For(0, stores, i =>
+                {
+                    List<BlockRaw> fromStore = LoadBlocksFromRocksDb(storePaths[i]);
+                    perStore[i] = fromStore;
+
+                    // Built here, printed below in store order. Writing to the console from inside
+                    // the loop would put the lines down in whatever order the threads happened to
+                    // finish, which reads like the stores are out of order.
+                    if (fromStore.Count == 0)
+                    {
+                        summary[i] = "  " + Path.GetFileName(storePaths[i]) + " : empty";
+                    }
+                    else
+                    {
+                        summary[i] = "  " + Path.GetFileName(storePaths[i]) + " : " + fromStore.Count
+                                     + " blocks, heights " + fromStore[0].BlockIndex
+                                     + " to " + fromStore[fromStore.Count - 1].BlockIndex;
+                    }
+                });
+            }
+            catch (AggregateException ex)
+            {
+                // Parallel.For collects everything that threw and hands it back in one of these,
+                // whose own Message is just "One or more errors occurred" - the part worth reading
+                // is inside it. Printed and then rethrown as it stands, so the caller decides what
+                // a failed load means and nothing arrives back looking like an empty chain.
+                Console.Error.WriteLine("could not load the stores:");
+                foreach (Exception inner in ex.Flatten().InnerExceptions)
+                {
+                    Console.Error.WriteLine("  " + inner.Message);
+                }
+                throw;
+            }
+
+            loadClock.Stop();
+
+            foreach (string line in summary)
+            {
+                Console.WriteLine(line);
+            }
+
+            // Joined in store order, which is height order - the threads finish in whatever order
+            // they like but nothing reads perStore until they are all done. Sized up front so the
+            // list does not copy its whole array every time it grows past a couple of hundred
+            // thousand entries.
+            var loaded = new List<BlockRaw>(expected);
+            foreach (List<BlockRaw> fromStore in perStore)
+            {
+                loaded.AddRange(fromStore);
+            }
+
+            Console.WriteLine("rocksdb loaded: " + loaded.Count + " blocks from " + stores
+                              + " store(s) in " + loadClock.Elapsed.TotalSeconds.ToString("F2") + "s");
+
+            // What was asked for is what came back. A store written short, or one holding heights
+            // other than the ones its number implies, is caught here rather than three hours later
+            // in a balance that does not reconcile.
+            if (loaded.Count != expected)
+            {
+                throw new InvalidDataException("asked for heights " + startHeight + " to " + lastHeight
+                    + ", which is " + expected + " blocks, and the stores hold " + loaded.Count);
+            }
+
+            if (loaded[0].BlockIndex != startHeight || loaded[loaded.Count - 1].BlockIndex != lastHeight)
+            {
+                throw new InvalidDataException("asked for heights " + startHeight + " to " + lastHeight
+                    + " and got " + loaded[0].BlockIndex + " to " + loaded[loaded.Count - 1].BlockIndex);
+            }
+
+            // And they are a chain, in order, with nothing missing between them - each block's
+            // parent being the one before it is the property everything downstream is built on,
+            // and the join across stores is where it would break.
+            int brokenLinks = 0;
+            for (int i = 1; i < loaded.Count; i++)
+            {
+                if (loaded[i].GetPrevBlockHash() != loaded[i - 1].DisplayHash)
+                {
+                    brokenLinks++;
+                    if (brokenLinks <= 5)
+                    {
+                        Console.Error.WriteLine("  break at height " + loaded[i].BlockIndex
+                                                + ": parent is " + loaded[i].GetPrevBlockHash()
+                                                + ", previous block is " + loaded[i - 1].DisplayHash);
+                    }
+                }
+            }
+
+            if (brokenLinks > 0)
+            {
+                // Thrown rather than warned about. A run with a break in it still walks, still
+                // parses and still produces balances - wrong ones, with nothing about them to say
+                // so. Turn this into a Console.Error line if a broken run is ever worth having.
+                throw new InvalidDataException(brokenLinks + " blocks do not follow the block before"
+                    + " them - the run from " + startHeight + " to " + lastHeight + " is not a chain");
+            }
+
+            Console.WriteLine("  chain      : all " + (loaded.Count - 1) + " links hold");
+            Console.WriteLine("  first      : height " + loaded[0].BlockIndex + " " + loaded[0].DisplayHash);
+            Console.WriteLine("  last       : height " + loaded[loaded.Count - 1].BlockIndex
+                              + " " + loaded[loaded.Count - 1].DisplayHash);
+
+            return loaded;
+        }
+
 
         //junk
 
@@ -1025,7 +2450,7 @@ Position is the order blocks were written to the file, which is not chain height
   --hash <hash>               same as the positional hash
   --file <index>              same as the positional blk file index
   --block <index>             same as the positional block position
-  --dir <path>                directory holding the blk files (default " +  @")
+  --dir <path>                directory holding the blk files (default " + @")
   --out <file>                write the hex here instead of stdout
   --append <file>             append the block to this blk-format file, magic bytes and size
                               field and all, creating it if it does not exist
@@ -1102,7 +2527,7 @@ Examples:
 
             public string previousHash = "";
 
-            public string timestamp = ""; //68–71	e3c86849 Timestamp   Reverses to 0x4968c8e3 = 1,231,603,939 = Jan 10, 2009 16:12:19 UTC
+            public string timestamp = ""; //68â€“71	e3c86849 Timestamp   Reverses to 0x4968c8e3 = 1,231,603,939 = Jan 10, 2009 16:12:19 UTC
 
             /// <summary>
             /// The parent block's hash, read out of bytes 4..35 of the header and flipped into the
@@ -1217,7 +2642,7 @@ Examples:
                     // to a stripped one, or one of the two is corrupt. Worth saying out loud rather
                     // than quietly reporting "not equal".
                     //Console.Error.WriteLine("warning: " + DisplayHash + " has the same header in "
-                                            //+ Path + " and " + other.Path + " but different body bytes");
+                    //+ Path + " and " + other.Path + " but different body bytes");
                     return false;
                 }
 
@@ -1229,17 +2654,6 @@ Examples:
                 return Equals(obj as BlockRaw);
             }
 
-            public override int GetHashCode()
-            {
-                // Only the fields Equals still compares. Equal objects have to hash the same, so
-                // Path / BlockIndex / Offset cannot be in here while Equals ignores them - the same
-                // block found in two files is equal, and would otherwise land in two different
-                // buckets of a Dictionary or HashSet and never be found again.
-                //
-                // Raw is skipped on purpose: hashing megabytes to look one block up is not worth
-                // it, and DisplayHash already commits to the header.
-                return HashCode.Combine(DisplayHash, Size);
-            }
 
             /// <summary>Null-safe, so `found == null` still means what it looks like.</summary>
             public static bool operator ==(BlockRaw? left, BlockRaw? right)
@@ -1895,7 +3309,7 @@ Examples:
                                   + "  " + FormatUnixTime(highest).PadRight(20)
                                   + "  " + FormatGap((long)highest - lowest));
 
-                if(count++ > MAXBLKDATFILE)
+                if (count++ > MAXBLKDATFILE)
                     break;
 
             }
@@ -2049,12 +3463,12 @@ Examples:
                         WriteRecordWithKey(dst, Convert.FromHexString(fake_block_33_is_22_byteslongerthan_real_block33), key);
                     }*/
                     WriteRecordWithKey(dst, ReadBlockBytes(src, r.Offset, r.Size, key), key);
-                    
-                    
-                    
-                    
-               
-                    
+
+
+
+
+
+
                     //if(count > 1000) // trevor todo remove this limit, just for testing
                     //{ break; }
 
@@ -2072,17 +3486,17 @@ Examples:
             File.Move(temp, path, overwrite: true);
 
             // why user Error here Claude?
-            //Everything that is commentary about the run — the field dump at lines 592–605, "not found", the reorder summary at 1512 — goes to Console.Error so it stays on the terminal and never contaminates that redirected file. Same convention as curl, dd, or ffmpeg: stdout carries data, stderr carries progress and diagnostics. Both interleave normally when nobody redirects, so you lose nothing in interactive use.
+            //Everything that is commentary about the run â€” the field dump at lines 592â€“605, "not found", the reorder summary at 1512 â€” goes to Console.Error so it stays on the terminal and never contaminates that redirected file. Same convention as curl, dd, or ffmpeg: stdout carries data, stderr carries progress and diagnostics. Both interleave normally when nobody redirects, so you lose nothing in interactive use.
             //Two other properties that matter for the line you asked about:
             //-Console.Error is auto - flushed, Console.Out is not necessarily.If the process throws partway through a reorder, the "rewrote N blocks" messages already emitted are guaranteed to have surfaced.
             //- It's a status line, not a result. The caller gets sorted.Count as the return value at line 1515; the text is for a human watching.
-            //That said, this file isn't consistent about it. The --help text (566), the argument-error message (157), and the "no arguments" notice (464) are also on stderr, which is right, but the tables at 1353–1384 and the summaries at 375–394 use Console.WriteLine — stdout — even though they're equally diagnostic.And lines 1488 / 1498("go", "write fake block33") are breakpoint bait on stdout.If you ever pipe the hex output for real, those would need moving to stderr.
-                        Console.Error.WriteLine(Path.GetFileName(path) + ": rewrote " + sorted.Count
-                                    + " blocks in timestamp order ("
-                                    + DateTimeOffset.FromUnixTimeSeconds(sorted[0].UnixTime).UtcDateTime.ToString("u")
-                                    + " to "
-                                    + DateTimeOffset.FromUnixTimeSeconds(sorted[sorted.Count - 1].UnixTime).UtcDateTime.ToString("u")
-                                    + ")");
+            //That said, this file isn't consistent about it. The --help text (566), the argument-error message (157), and the "no arguments" notice (464) are also on stderr, which is right, but the tables at 1353â€“1384 and the summaries at 375â€“394 use Console.WriteLine â€” stdout â€” even though they're equally diagnostic.And lines 1488 / 1498("go", "write fake block33") are breakpoint bait on stdout.If you ever pipe the hex output for real, those would need moving to stderr.
+            Console.Error.WriteLine(Path.GetFileName(path) + ": rewrote " + sorted.Count
+                        + " blocks in timestamp order ("
+                        + DateTimeOffset.FromUnixTimeSeconds(sorted[0].UnixTime).UtcDateTime.ToString("u")
+                        + " to "
+                        + DateTimeOffset.FromUnixTimeSeconds(sorted[sorted.Count - 1].UnixTime).UtcDateTime.ToString("u")
+                        + ")");
 
             return sorted.Count;
         }
@@ -2494,7 +3908,14 @@ Examples:
 
             for (ulong i = 0; i < txCount; i++)
             {
-                block.Transactions.Add(ReadTransaction(raw.Raw, ref pos));
+                Transaction tx = ReadTransaction(raw.Raw, ref pos);
+
+                // Stamped here rather than at the call site that collects them: a transaction
+                // knows nothing about where it came from once it is out of the block, and this is
+                // the last point where both are in hand. Every caller of ParseBlock gets it.
+                tx.BlockHeight = blockNumber;
+
+                block.Transactions.Add(tx);
             }
 
             // The record's size field already said where this block ends, so landing anywhere else
@@ -2597,6 +4018,12 @@ Examples:
             {
                 tx.Hash = Transaction.ComputeHash(data.AsSpan(start, pos - start));
             }
+
+            // The span the walk just covered. start and pos are the only two numbers needed to
+            // find this transaction in the block again, and this is the one place that has both -
+            // ParseBlock sees pos move but never learns where each transaction began.
+            tx.ByteOffset = start;
+            tx.ByteLength = pos - start;
 
             return tx;
         }
@@ -2898,8 +4325,8 @@ Examples:
         /// </summary>
         static readonly Dictionary<int, string> KnownMainnetHeights = new Dictionary<int, string>
         {
-            [0]  = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
-            [1]  = "00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048",
+            [0] = "000000000019d6689c085ae165831e934ff763ae46a2a6c172b3f1b60a8ce26f",
+            [1] = "00000000839a8e6886ab5951d76f411475428afc90947ee320161bbf18eb6048",
             [32] = "00000000e5cb7c6c273547b0c9421b01e23310ed83f934b96270f35a4d66f6e3",
             [33] = "00000000a87073ea3d7af299e02a434598b9c92094afa552e0711afcc0857962",
             [34] = "00000000a73fb23b6c42b18b3253ed29c5d0c80d84624efa12c2cf05c4b4318f",
@@ -3283,6 +4710,3275 @@ Examples:
         }
 
         // ------------------------------------------------------------------------------------
+        // Addresses - turning an output script into the address an explorer would show
+        // ------------------------------------------------------------------------------------
+
+        /// <summary>SHA-256 then RIPEMD-160, the hash every base58 address is built on.</summary>
+        static void Hash160(ReadOnlySpan<byte> data, Span<byte> result20)
+        {
+            Span<byte> sha = stackalloc byte[32];
+            SHA256.HashData(data, sha);
+
+            // BouncyCastle rather than the hand-rolled RIPEMD160Managed in the library: .NET
+            // dropped RIPEMD-160 after .NET Framework, and this is the digest the live code paths
+            // in this repo already use. It wants arrays, so this is the one copy that stays.
+            var ripemd = new Org.BouncyCastle.Crypto.Digests.RipeMD160Digest();
+            ripemd.BlockUpdate(sha.ToArray(), 0, 32);
+            byte[] digest = new byte[20];
+            ripemd.DoFinal(digest, 0);
+            digest.CopyTo(result20);
+        }
+
+        const string Base58Alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+
+        /// <summary>
+        /// Base58, as long division over a stack buffer.
+        ///
+        /// Helpers.Base58Encode produces the same string, but does it with repeated
+        /// BigInteger.DivideAndRemainder - a fresh BigInteger allocated per digit, about 34 of them
+        /// per address. Measured at ~49 microseconds a call, which made deriving addresses 82% of
+        /// the time spent building the index and dwarfed both parsing the blocks and writing the
+        /// rows. This allocates nothing but the string it returns.
+        /// </summary>
+        public static string Base58Encode(ReadOnlySpan<byte> input)
+        {
+            int zeroes = 0;
+            while (zeroes < input.Length && input[zeroes] == 0) zeroes++;
+
+            // log(256)/log(58) is a shade under 1.37, so this is always enough room.
+            int size = (input.Length - zeroes) * 138 / 100 + 1;
+            Span<byte> buffer = stackalloc byte[size];
+            buffer.Clear();
+
+            int length = 0;
+            for (int i = zeroes; i < input.Length; i++)
+            {
+                int carry = input[i];
+                int digits = 0;
+                for (int k = size - 1; (carry != 0 || digits < length) && k >= 0; k--, digits++)
+                {
+                    carry += 256 * buffer[k];
+                    buffer[k] = (byte)(carry % 58);
+                    carry /= 58;
+                }
+                length = digits;
+            }
+
+            int start = size - length;
+            Span<char> chars = stackalloc char[zeroes + length];
+            for (int i = 0; i < zeroes; i++) chars[i] = '1';
+            for (int i = 0; i < length; i++) chars[zeroes + i] = Base58Alphabet[buffer[start + i]];
+            return new string(chars);
+        }
+
+        /// <summary>
+        /// Base58Check: a version byte, the payload, and the first four bytes of the double SHA-256
+        /// of both as a checksum, all base58 encoded.
+        /// </summary>
+        static string Base58Check(byte version, ReadOnlySpan<byte> payload)
+        {
+            Span<byte> full = stackalloc byte[payload.Length + 5];
+            full[0] = version;
+            payload.CopyTo(full.Slice(1));
+
+            Span<byte> once = stackalloc byte[32];
+            Span<byte> twice = stackalloc byte[32];
+            SHA256.HashData(full.Slice(0, payload.Length + 1), once);
+            SHA256.HashData(once, twice);
+            twice.Slice(0, 4).CopyTo(full.Slice(payload.Length + 1));
+
+            return Base58Encode(full);
+        }
+
+        /// <summary>
+        /// The bytes a Base58Check string encodes - version, payload and the four checksum bytes -
+        /// with the checksum verified. The inverse of Base58Check above, and long multiplication
+        /// where that is long division, over the same kind of stack buffer.
+        ///
+        /// The checksum is what makes this worth having over a plain decode: an address with a
+        /// character wrong decodes perfectly well into 25 bytes that are simply not the address
+        /// anybody meant, and nothing downstream would ever notice. Two SHA-256s per call say so
+        /// at the door instead.
+        /// </summary>
+        static byte[] Base58CheckDecode(string text)
+        {
+            // Leading '1's are leading zero bytes - the same convention Base58Encode writes them
+            // out with - and carry no value, so they are counted here and put back at the end.
+            int zeroes = 0;
+            while (zeroes < text.Length && text[zeroes] == '1') zeroes++;
+
+            // log(58)/log(256) is a shade over 0.732, so this is always enough room.
+            int size = (text.Length - zeroes) * 733 / 1000 + 1;
+            Span<byte> buffer = stackalloc byte[size];
+            buffer.Clear();
+
+            int length = 0;
+            for (int i = zeroes; i < text.Length; i++)
+            {
+                int digit = Base58Alphabet.IndexOf(text[i]);
+                if (digit < 0)
+                {
+                    throw new FormatException("'" + text[i] + "' is not a base58 character, so '"
+                                              + text + "' is not an address");
+                }
+
+                int carry = digit;
+                int digits = 0;
+                for (int k = size - 1; (carry != 0 || digits < length) && k >= 0; k--, digits++)
+                {
+                    carry += 58 * buffer[k];
+                    buffer[k] = (byte)(carry % 256);
+                    carry /= 256;
+                }
+                length = digits;
+            }
+
+            byte[] decoded = new byte[zeroes + length];
+            buffer.Slice(size - length, length).CopyTo(decoded.AsSpan(zeroes));
+
+            if (decoded.Length < 5)
+            {
+                throw new FormatException("'" + text + "' decodes to " + decoded.Length
+                                          + " bytes, which is not long enough to hold a checksum");
+            }
+
+            Span<byte> once = stackalloc byte[32];
+            Span<byte> twice = stackalloc byte[32];
+            SHA256.HashData(decoded.AsSpan(0, decoded.Length - 4), once);
+            SHA256.HashData(once, twice);
+
+            for (int i = 0; i < 4; i++)
+            {
+                if (twice[i] != decoded[decoded.Length - 4 + i])
+                {
+                    throw new FormatException("the checksum on '" + text + "' does not match its"
+                                              + " contents, so it is not an address anybody issued"
+                                              + " - a character of it is wrong");
+                }
+            }
+
+            return decoded;
+        }
+
+        /// <summary>
+        /// The address an output pays to, or null when the script does not name one.
+        ///
+        /// Only the forms that existed in the era this data covers are recognised, which is the
+        /// whole of the standard set up to 2012:
+        ///
+        ///   P2PKH  OP_DUP OP_HASH160 &lt;20&gt; OP_EQUALVERIFY OP_CHECKSIG   -> version 0x00, a '1' address
+        ///   P2SH   OP_HASH160 &lt;20&gt; OP_EQUAL                            -> version 0x05, a '3' address
+        ///   P2PK   &lt;65 or 33 byte pubkey&gt; OP_CHECKSIG                  -> version 0x00, hashing the key
+        ///
+        /// P2PK is the odd one: the script commits to a public key and not to any hash, so it has
+        /// no address in it at all. The one returned is the address of that key, which is what
+        /// explorers show for these outputs and what makes the early chain searchable by address.
+        ///
+        /// Everything else - bare multisig, OP_RETURN, the outright malformed, and every segwit
+        /// and taproot form from later on - returns null rather than a guess. Callers are expected
+        /// to keep the row and leave the address empty, so the gap stays visible.
+        /// </summary>
+        public static string? ScriptToAddress(byte[] script)
+        {
+            // P2PKH first: by the era this data reaches it is most of every block, so the cheapest
+            // test wants to be the one that matches most often.
+            if (script.Length == 25 && script[0] == 0x76 && script[1] == 0xA9 && script[2] == 0x14
+                && script[23] == 0x88 && script[24] == 0xAC)
+            {
+                return Base58Check(0x00, script.AsSpan(3, 20));
+            }
+
+            if (script.Length == 23 && script[0] == 0xA9 && script[1] == 0x14 && script[22] == 0x87)
+            {
+                return Base58Check(0x05, script.AsSpan(2, 20));
+            }
+
+            if (script.Length == 67 && script[0] == 0x41 && script[66] == 0xAC)
+            {
+                Span<byte> keyHash = stackalloc byte[20];
+                Hash160(script.AsSpan(1, 65), keyHash);
+                return Base58Check(0x00, keyHash);
+            }
+
+            if (script.Length == 35 && script[0] == 0x21 && script[34] == 0xAC)
+            {
+                Span<byte> keyHash = stackalloc byte[20];
+                Hash160(script.AsSpan(1, 33), keyHash);
+                return Base58Check(0x00, keyHash);
+            }
+
+            return null;
+        }
+
+        // ------------------------------------------------------------------------------------
+        // Block reward addresses
+        // ------------------------------------------------------------------------------------
+
+        /// <summary>What one address was paid by the block rewards it appears in.</summary>
+        public sealed class CoinbaseReward
+        {
+            /// <summary>The address a coinbase output pays.</summary>
+            public string Address = "";
+
+            /// <summary>How many blocks' rewards it was paid out of. Counted once per block even
+            /// when a coinbase splits the reward over two outputs that land on it.</summary>
+            public int Blocks;
+
+            /// <summary>Total satoshis those blocks paid it - subsidy and fees together, since a
+            /// coinbase output is one number and does not separate them.</summary>
+            public ulong Value;
+
+            /// <summary>Height of the first block that paid it.</summary>
+            public int FirstHeight = -1;
+
+            /// <summary>Height of the last block that paid it, equal to FirstHeight when only one
+            /// block ever did.</summary>
+            public int LastHeight = -1;
+        }
+
+        /// <summary>
+        /// Every address the block reward was paid to across a run of blocks, with what each was
+        /// paid and how many blocks paid it.
+        ///
+        /// The reward is the first transaction of a block and nothing else - a coinbase, which
+        /// spends the all-zero outpoint because the coins it pays out are new rather than someone
+        /// else's. So this reads the transaction count varint at byte 80, parses exactly one
+        /// transaction, and moves on to the next block. Over 200,000 blocks the transactions left
+        /// unparsed are almost all of the bytes, which is why this is worth doing here rather than
+        /// calling ParseBlock and taking Transactions[0].
+        ///
+        /// What "the 50 BTC reward" amounts to needs some care:
+        ///
+        ///   - The subsidy halves every 210,000 blocks, so every block below that height carries
+        ///     one of 50 BTC and the whole of the first 200,000 qualifies. Nothing here filters on
+        ///     the amount, and nothing needs to.
+        ///   - A coinbase output pays the subsidy PLUS the fees of its block, so once blocks stop
+        ///     being empty the values run over 50 BTC. What comes back is what was actually paid,
+        ///     not 50 x Blocks.
+        ///   - A miner may claim less than it is owed, and a few did - block 124724 is the well
+        ///     known one, a satoshi short. Those come out just under.
+        ///   - A coinbase may have several outputs. Each is credited to its own address, and the
+        ///     block counts once against each distinct address in it.
+        ///
+        /// An output whose script names no address - ScriptToAddress returns null for anything
+        /// that is not P2PKH, P2SH or P2PK - is counted and reported rather than guessed at.
+        ///
+        /// Two things in this range look like errors in the output and are not. Genesis pays
+        /// 1A1zP1eP5QGefi2DMPTfTL5SLmv7DivfNa 50 BTC that Bitcoin Core never puts in the UTXO set,
+        /// so that reward exists in the data and can never be spent. And the BIP30 pairs at
+        /// heights 91722/91880 and 91812/91842 carry byte-identical coinbases, where the later
+        /// block's outputs overwrote the earlier block's and destroyed 50 BTC each time. Both
+        /// halves of a pair are counted here - this is what the chain paid, not what survived.
+        ///
+        /// Comes back sorted by total paid, largest first.
+        /// </summary>
+        /// <param name="blocks">Blocks in height order. Only the coinbase of each is read.</param>
+        /// <param name="heightLimit">Stop before this height, so 200000 means the first 200,000
+        /// blocks: heights 0 to 199999. Blocks at or above it are skipped.</param>
+        /// <param name="csvPath">Where to write the full list, or null to only return it.</param>
+        public static List<CoinbaseReward> CollectCoinbaseAddresses(List<BlockRaw> blocks, int heightLimit,
+                                                                   string? csvPath)
+        {
+            var byAddress = new Dictionary<string, CoinbaseReward>();
+
+            // Cleared per block rather than allocated per block. It is here for the one job of
+            // stopping a coinbase that pays the same address from two outputs - which pools do -
+            // from counting its block twice.
+            var seenInBlock = new HashSet<string>();
+
+            int blocksRead = 0;
+            int outputs = 0;
+            int outputsWithNoAddress = 0;
+            ulong paid = 0;
+
+            foreach (BlockRaw raw in blocks)
+            {
+                if (raw.BlockIndex >= heightLimit)
+                {
+                    continue;
+                }
+
+                int pos = 80;
+                ulong txCount = ReadVarInt(raw.Raw, ref pos);
+                if (txCount == 0)
+                {
+                    throw new InvalidDataException("block " + raw.BlockIndex + " has no coinbase");
+                }
+
+                Transaction coinbase = ReadTransaction(raw.Raw, ref pos);
+                blocksRead++;
+                seenInBlock.Clear();
+
+                foreach (Transaction.TxOutput output in coinbase.Outputs)
+                {
+                    outputs++;
+                    paid += output.Value;
+
+                    string? address = ScriptToAddress(output.ScriptPubKey);
+                    if (address == null)
+                    {
+                        outputsWithNoAddress++;
+                        continue;
+                    }
+
+                    CoinbaseReward? reward;
+                    if (!byAddress.TryGetValue(address, out reward))
+                    {
+                        reward = new CoinbaseReward();
+                        reward.Address = address;
+
+                        // First and last are read off the walk rather than compared, which is
+                        // only right because the blocks arrive in height order.
+                        reward.FirstHeight = raw.BlockIndex;
+                        byAddress.Add(address, reward);
+                    }
+
+                    reward.Value += output.Value;
+                    reward.LastHeight = raw.BlockIndex;
+
+                    if (seenInBlock.Add(address))
+                    {
+                        reward.Blocks++;
+                    }
+                }
+            }
+
+            var list = new List<CoinbaseReward>(byAddress.Count);
+            foreach (KeyValuePair<string, CoinbaseReward> entry in byAddress)
+            {
+                list.Add(entry.Value);
+            }
+
+            // Biggest earner first, address order inside a tie so that two runs over the same
+            // blocks produce the same file - a dictionary hands its entries back in an order that
+            // is its own business and can differ between runs.
+            list.Sort((a, b) =>
+            {
+                if (a.Value != b.Value)
+                {
+                    return b.Value.CompareTo(a.Value);
+                }
+                return string.CompareOrdinal(a.Address, b.Address);
+            });
+
+            Console.WriteLine("block reward addresses below height " + heightLimit + ":");
+            Console.WriteLine("  blocks       : " + blocksRead);
+            Console.WriteLine("  addresses    : " + list.Count);
+            Console.WriteLine("  outputs      : " + outputs + " coinbase outputs");
+            Console.WriteLine("  paid         : " + (paid / 100000000.0).ToString("F8") + " BTC");
+            if (outputsWithNoAddress > 0)
+            {
+                Console.WriteLine("  no address   : " + outputsWithNoAddress
+                                  + " coinbase outputs pay a script with no address in it");
+            }
+
+            int show = 20;
+            if (list.Count < show)
+            {
+                show = list.Count;
+            }
+
+            for (int i = 0; i < show; i++)
+            {
+                CoinbaseReward reward = list[i];
+                Console.WriteLine("  " + reward.Address.PadRight(35)
+                                  + reward.Blocks.ToString().PadLeft(7) + " blocks "
+                                  + (reward.Value / 100000000.0).ToString("F8").PadLeft(18) + " BTC"
+                                  + "  heights " + reward.FirstHeight + " to " + reward.LastHeight);
+            }
+
+            if (csvPath != null)
+            {
+                string? directory = Path.GetDirectoryName(csvPath);
+                if (directory != null)
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                using (var writer = new StreamWriter(csvPath, false))
+                {
+                    writer.WriteLine("address,blocks,satoshis,btc,firstHeight,lastHeight");
+                    foreach (CoinbaseReward reward in list)
+                    {
+                        // Invariant culture on the BTC column only: every other column is an
+                        // integer and formats the same anywhere, but F8 on a machine set to a
+                        // comma decimal separator would put a second comma inside the row.
+                        string btc = (reward.Value / 100000000.0)
+                            .ToString("F8", System.Globalization.CultureInfo.InvariantCulture);
+
+                        writer.WriteLine(reward.Address + "," + reward.Blocks + "," + reward.Value
+                                         + "," + btc + "," + reward.FirstHeight + "," + reward.LastHeight);
+                    }
+                }
+
+                Console.WriteLine("  written      : " + csvPath);
+            }
+
+            return list;
+        }
+
+        // ------------------------------------------------------------------------------------
+        // Address balances
+        // ------------------------------------------------------------------------------------
+
+        /// <summary>Where one address stands after every transaction that touched it.</summary>
+        public sealed class AddressBalance
+        {
+            /// <summary>The address itself. This string is the one shared instance for it - the
+            /// UTXO set points at this same object rather than keeping a copy of its own.</summary>
+            public string Address = "";
+
+            /// <summary>Satoshis paid to it minus satoshis spent from it. Signed because the type
+            /// has to be able to represent a walk that went wrong; over a run that starts at
+            /// height 0 it cannot legitimately go below zero, and any that does is reported.</summary>
+            public long Balance;
+
+            /// <summary>Height of the first block holding a transaction that touched it.</summary>
+            public int FirstHeight = -1;
+
+            /// <summary>Height of the last one.</summary>
+            public int LastHeight = -1;
+
+            /// <summary>How many transactions touched it, counted once per transaction however
+            /// many of that transaction's inputs and outputs land on the address.</summary>
+            public int Transactions;
+
+            /// <summary>The ordinal of the last transaction counted against it, which is how
+            /// Transactions stays one-per-transaction: a second touch from the same transaction
+            /// finds its own number here and adds nothing. Cheaper than a per-transaction set of
+            /// addresses, and it costs eight bytes on a record that already exists.</summary>
+            internal long LastTransactionSeen = -1;
+        }
+
+        /// <summary>
+        /// The balance of every address that appears anywhere in a run of blocks, with the range
+        /// of heights it was active over and how many transactions touched it.
+        ///
+        /// The two sides are the same two the SQLite index files as direction 1 and direction 0,
+        /// and are derived here exactly as they are there:
+        ///
+        ///   credit  an output, address straight out of ScriptToAddress(output.ScriptPubKey).
+        ///           Coinbase outputs are outputs like any other, so the mining rewards are in
+        ///           these totals without needing anything said about them - the 50 BTC a block
+        ///           pays lands on the miner's address the same way a payment does.
+        ///   debit   an input, which names no address at all. The address being spent belongs to
+        ///           the output the input's outpoint points at, in some earlier block, so the only
+        ///           way to have it is to have carried that output along - which is what `unspent`
+        ///           is. Outputs go in, inputs take them back out, so it stays the size of the
+        ///           UTXO set rather than growing to every output ever made.
+        ///
+        /// Blocks must therefore arrive in height order, and the run has to start at height 0 for
+        /// the balances to mean anything: an input whose outpoint was never seen cannot be
+        /// subtracted from anybody, so a run starting higher up silently leaves balances too big.
+        /// The count of those is reported, and the reconciliation at the end is only printed when
+        /// it is zero.
+        ///
+        /// Two categories of coin sit outside the totals, both counted rather than hidden:
+        /// outputs whose script names no address (bare multisig, OP_RETURN, the malformed - see
+        /// ScriptToAddress), and inputs that spend one of those. Neither can be attributed to an
+        /// address, so neither moves a balance, and both ends stay consistent because such an
+        /// output still goes into the UTXO set - carrying a null address - so spending it is
+        /// recognised as unattributable rather than mistaken for an outpoint never seen.
+        ///
+        /// Balances here are what the arithmetic of the chain says, which is not always what an
+        /// address can actually spend. Genesis pays 50 BTC to a coinbase Bitcoin Core never puts
+        /// in its UTXO set, and the BIP30 pairs at heights 91722/91880 and 91812/91842 pay two
+        /// byte-identical coinbases where the later overwrote the earlier. Those coins are counted
+        /// as received here and are gone in reality.
+        ///
+        /// Comes back sorted by balance, largest first.
+        /// </summary>
+        /// <param name="blocks">Blocks in height order, starting at height 0.</param>
+        /// <param name="heightLimit">Stop before this height, so 200000 means the first 200,000
+        /// blocks: heights 0 to 199999.</param>
+        /// <param name="csvPath">Where to write the full table, or null to only return it.</param>
+        public static List<AddressBalance> CollectAddressBalances(List<BlockRaw> blocks, int heightLimit,
+                                                                  string? csvPath)
+        {
+            var balances = new Dictionary<string, AddressBalance>();
+
+            // The UTXO set, and the reason inputs can be attributed at all. Keyed by a struct so
+            // the entries live in the dictionary's own storage and cost no per-outpoint
+            // allocation - at height 200,000 there are a few million of them.
+            var unspent = new Dictionary<OutPoint, UnspentOutput>();
+
+            // Numbered rather than compared: every transaction gets the next number, and an
+            // address records the number of the last one it was counted against.
+            long transactionOrdinal = 0;
+
+            int blocksRead = 0;
+            int transactions = 0;
+            int coinbaseInputs = 0;
+            int unresolvedInputs = 0;
+            int outputsWithNoAddress = 0;
+            int spentWithNoAddress = 0;
+
+            // Kept for the reconciliation at the end. Everything a coinbase pays is new money;
+            // everything a normal transaction leaves behind is a fee, which comes back as part of
+            // some coinbase in the same block and so is already inside `mined`.
+            ulong mined = 0;
+            ulong fees = 0;
+
+            var clock = Stopwatch.StartNew();
+
+            foreach (BlockRaw raw in blocks)
+            {
+                if (raw.BlockIndex >= heightLimit)
+                {
+                    continue;
+                }
+
+                Block parsed = ParseBlock(raw, raw.BlockIndex);
+                blocksRead++;
+
+                if (raw.BlockIndex % 10000 == 0)
+                    Console.WriteLine(raw.BlockIndex);
+
+                foreach (Transaction tx in parsed.Transactions)
+                {
+                    transactionOrdinal++;
+                    transactions++;
+
+                    bool coinbase = false;
+                    ulong spent = 0;
+                    ulong created = 0;
+
+                    // Inputs before outputs. A transaction cannot spend its own outputs - that
+                    // would need its txid inside itself - but a later transaction in the same
+                    // block routinely spends an earlier one's, which is why the UTXO set has to
+                    // be updated transaction by transaction rather than block by block.
+                    for (int n = 0; n < tx.Inputs.Count; n++)
+                    {
+                        Transaction.TxInput input = tx.Inputs[n];
+
+                        // A coinbase spends nothing and names the all-zero outpoint. There is no
+                        // address on the other end of it to debit.
+                        if (IsAllZero(input.TxId))
+                        {
+                            coinbase = true;
+                            coinbaseInputs++;
+                            continue;
+                        }
+
+                        var spending = new OutPoint(input.TxId, input.Vout);
+
+                        UnspentOutput previous;
+                        if (!unspent.TryGetValue(spending, out previous))
+                        {
+                            unresolvedInputs++;
+                            continue;
+                        }
+
+                        // Out of the set the moment it is spent. This is what keeps the dictionary
+                        // the size of the unspent set instead of the size of every output the
+                        // chain has ever made.
+                        unspent.Remove(spending);
+                        spent += previous.Value;
+
+                        if (previous.Address == null)
+                        {
+                            // The value is known - it is the output's own - but there is no
+                            // address to take it off, so it only counts towards the fee above.
+                            spentWithNoAddress++;
+                            continue;
+                        }
+
+                        AddressBalance from = Touch(balances, previous.Address, raw.BlockIndex,
+                                                    transactionOrdinal);
+                        from.Balance -= (long)previous.Value;
+                    }
+
+                    for (int n = 0; n < tx.Outputs.Count; n++)
+                    {
+                        Transaction.TxOutput output = tx.Outputs[n];
+                        created += output.Value;
+
+                        string? address = ScriptToAddress(output.ScriptPubKey);
+                        if (address == null)
+                        {
+                            outputsWithNoAddress++;
+
+                            // Still goes in. Whoever spends it later needs to find it here, or the
+                            // spend would be counted as an outpoint this walk never saw and the
+                            // two ends of the report would stop agreeing.
+                            unspent[new OutPoint(tx.Hash, (uint)n)] =
+                                new UnspentOutput { Address = null, Value = output.Value };
+                            continue;
+                        }
+
+                        AddressBalance to = Touch(balances, address, raw.BlockIndex, transactionOrdinal);
+                        to.Balance += (long)output.Value;
+
+                        // to.Address, not `address`. They are equal strings but only one of them
+                        // is the instance already held in the table, and pointing the UTXO entry
+                        // at that one keeps a few million duplicate 34-character strings out of
+                        // memory for as long as the outputs stay unspent.
+                        unspent[new OutPoint(tx.Hash, (uint)n)] =
+                            new UnspentOutput { Address = to.Address, Value = output.Value };
+                    }
+
+                    if (coinbase)
+                    {
+                        mined += created;
+                    }
+                    else if (spent >= created)
+                    {
+                        // What went in and did not come out. Only meaningful when every input
+                        // resolved, which is why the line it feeds is suppressed otherwise - and
+                        // the guard is there for the same reason: an input that resolved to
+                        // nothing leaves `spent` short of `created`, and on unsigned arithmetic
+                        // that subtraction does not go negative, it wraps.
+                        fees += spent - created;
+                    }
+                }
+            }
+
+            clock.Stop();
+
+            var list = new List<AddressBalance>(balances.Count);
+            long balanceTotal = 0;
+            int negative = 0;
+
+            foreach (KeyValuePair<string, AddressBalance> entry in balances)
+            {
+                list.Add(entry.Value);
+                balanceTotal += entry.Value.Balance;
+                if (entry.Value.Balance < 0)
+                {
+                    negative++;
+                }
+            }
+
+            // Richest first, address order inside a tie so two runs over the same blocks produce
+            // the same file - a dictionary hands its entries back in an order that is its own
+            // business and need not be the same twice.
+            list.Sort((a, b) =>
+            {
+                if (a.Balance != b.Balance)
+                {
+                    return b.Balance.CompareTo(a.Balance);
+                }
+                return string.CompareOrdinal(a.Address, b.Address);
+            });
+
+            // The part of the UTXO set that belongs to nobody nameable. It is the whole of the
+            // difference between what was mined and what the balances add up to, which is what
+            // makes the check below exact rather than approximate.
+            ulong unspentWithNoAddress = 0;
+            foreach (KeyValuePair<OutPoint, UnspentOutput> entry in unspent)
+            {
+                if (entry.Value.Address == null)
+                {
+                    unspentWithNoAddress += entry.Value.Value;
+                }
+            }
+
+            Console.WriteLine("address balances below height " + heightLimit + ":");
+            Console.WriteLine("  blocks       : " + blocksRead + " in "
+                              + clock.Elapsed.TotalSeconds.ToString("F1") + "s");
+            Console.WriteLine("  transactions : " + transactions);
+            Console.WriteLine("  addresses    : " + list.Count);
+            Console.WriteLine("  coinbase in  : " + coinbaseInputs + " (no address to debit)");
+            Console.WriteLine("  mined        : " + (mined / 100000000.0).ToString("F8")
+                              + " BTC paid out by coinbases, fees included");
+            Console.WriteLine("  balances     : " + (balanceTotal / 100000000.0).ToString("F8") + " BTC held");
+            Console.WriteLine("  utxo set     : " + unspent.Count + " unspent outputs");
+
+            if (outputsWithNoAddress > 0)
+            {
+                Console.WriteLine("  no address   : " + outputsWithNoAddress
+                                  + " outputs pay a script with no address in it, "
+                                  + spentWithNoAddress + " of them later spent");
+            }
+
+            if (unresolvedInputs > 0)
+            {
+                Console.WriteLine("  unresolved   : " + unresolvedInputs
+                                  + " inputs spend an output this walk never saw - the balances"
+                                  + " above them are too high and the run did not start at 0");
+            }
+            else
+            {
+                // Every satoshi ever mined is either sitting in the UTXO set or was burnt as a
+                // fee and mined again inside some later coinbase. So with nothing unresolved:
+                //
+                //     mined - fees == balances + the unspent outputs with no address
+                //
+                // A mismatch means the walk lost an output somewhere, which nothing else here
+                // would report - balances that are simply wrong still look like balances.
+                long expected = (long)mined - (long)fees;
+                long actual = balanceTotal + (long)unspentWithNoAddress;
+
+                Console.WriteLine("  fees         : " + (fees / 100000000.0).ToString("F8")
+                                  + " BTC spent but not paid out, re-mined inside the coinbases");
+                Console.WriteLine("  unattributed : " + (unspentWithNoAddress / 100000000.0).ToString("F8")
+                                  + " BTC unspent in scripts with no address");
+
+                if (expected == actual)
+                {
+                    Console.WriteLine("  reconciles   : mined - fees == balances + unattributed");
+                }
+                else
+                {
+                    Console.WriteLine("  MISMATCH     : mined - fees is " + expected
+                                      + " sats, balances + unattributed is " + actual
+                                      + ", off by " + (expected - actual));
+                }
+            }
+
+            if (negative > 0)
+            {
+                Console.WriteLine("  negative     : " + negative
+                                  + " addresses spent more than they were paid, which cannot happen"
+                                  + " on a walk that started at height 0");
+            }
+
+            int show = 20;
+            if (list.Count < show)
+            {
+                show = list.Count;
+            }
+
+            for (int i = 0; i < show; i++)
+            {
+                AddressBalance held = list[i];
+                Console.WriteLine("  " + held.Address.PadRight(35)
+                                  + (held.Balance / 100000000.0).ToString("F8").PadLeft(18) + " BTC"
+                                  + held.Transactions.ToString().PadLeft(8) + " txs"
+                                  + "  heights " + held.FirstHeight + " to " + held.LastHeight);
+            }
+
+            if (csvPath != null)
+            {
+                string? directory = Path.GetDirectoryName(csvPath);
+                if (directory != null)
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                // Balance in satoshis: it is what the chain actually counts in, it is exact, and
+                // an integer column cannot be mangled by whatever decimal separator the machine
+                // that opens the file happens to use.
+                using (var writer = new StreamWriter(csvPath, false))
+                {
+                    writer.WriteLine("address,balance,firstHeight,lastHeight,transactions");
+                    foreach (AddressBalance held in list)
+                    {
+                        writer.WriteLine(held.Address + "," + held.Balance + "," + held.FirstHeight
+                                         + "," + held.LastHeight + "," + held.Transactions);
+                    }
+                }
+
+                Console.WriteLine("  written      : " + csvPath + " (balance in satoshis)");
+            }
+
+            return list;
+        }
+
+        /// <summary>
+        /// The record for an address, made on first sight, with the heights and the transaction
+        /// count brought up to date. Returns it for the caller to move the balance on - which the
+        /// caller does rather than this, because the two sides move it in opposite directions.
+        /// </summary>
+        static AddressBalance Touch(Dictionary<string, AddressBalance> balances, string address,
+                                    int height, long transactionOrdinal)
+        {
+            AddressBalance? held;
+            if (!balances.TryGetValue(address, out held))
+            {
+                held = new AddressBalance();
+                held.Address = address;
+
+                // First and last are taken straight off the walk rather than compared against
+                // what is there, which is only right because the blocks arrive in height order.
+                held.FirstHeight = height;
+                balances.Add(address, held);
+            }
+
+            held.LastHeight = height;
+
+            if (held.LastTransactionSeen != transactionOrdinal)
+            {
+                held.LastTransactionSeen = transactionOrdinal;
+                held.Transactions++;
+            }
+
+            return held;
+        }
+
+        static long countCollisions = 0;
+        public static void addLookupAddress(long shrunkAddress, string address, SortedList<long, string> lookupAddress)
+        {
+            //SortedList<long, string> addressLookup = new SortedList<long, string>();
+            //addressLookup.Add(1234567890123L, "bc1q...");
+            
+            //simpleTransaction f2 = new simpleTransaction();
+            //long h3 = f2.shrinkStringAddress("12cbQLTFMXRnSzktFkuoG3eHoMeFtpTu3S");
+            //lookupAddress.Add(3325248302790856497L, "12cbQLTFMXRnSzktFkuoG3eHoMeFtpTu3S");
+            //lookupAddress.Add(-6697027017390134739L, "1Q2TWHE3GMdB6BZKafqwxXtWAWgFt5Jvm3");
+            //lookupAddress.TryGetValue(3325248302790856497L, out string? addr3);
+            //lookupAddress.TryGetValue(-6697027017390134739L, out string? addr4);
+
+            // preferred — no exception
+            if (lookupAddress.TryGetValue(shrunkAddress, out string? addr2))
+            {
+                if (false)//addr2 != address)
+                {
+                    simpleTransaction f = new simpleTransaction();
+                    long h =  f.shrinkStringAddress(addr2);
+                    long j = f.shrinkStringAddress(address);
+
+                    Console.WriteLine(addr2);
+                    Console.WriteLine(address);
+                    countCollisions++;
+                    Console.WriteLine("countCollisions " + countCollisions);
+                    //throw new Exception("Shrunk address collision");
+                }
+                //if(addr2 != address)
+                //{
+                //  Console.WriteLine(addr2 + " "  + address);
+                //throw new Exception("Shrunk address collision");
+                //}
+
+            }
+            else
+            {
+                lookupAddress.Add(shrunkAddress, address);
+            }
+
+        }
+
+        /// <summary>
+        /// The eight bytes every lookupAddress file starts with. Not a checksum and not a version
+        /// negotiation - it is only there so that a path typo pointed at one of the other .dat
+        /// files in that directory fails on the first read rather than reading a block record as a
+        /// key and a length and then allocating whatever the length happened to be.
+        /// </summary>
+        public const string LookupAddressMagic = "LKUPADR1";
+
+        /// <summary>
+        /// The whole table to one file: the magic above, then the entry count as four bytes little
+        /// endian, then one record per entry -
+        ///
+        ///     [8 bytes key, little endian][2 bytes UTF-8 length, little endian][that many bytes]
+        ///
+        /// Records are variable width, which is why the count is in the header: loadLookupAddress
+        /// cannot divide the file length by a record size the way loadFromDisk does, and it wants
+        /// the count up front anyway to size the SortedList once instead of growing it.
+        ///
+        /// Written in the order SortedList already keeps, which is ascending key. That is what
+        /// makes the load cheap - see loadLookupAddress - so the loop walks by index rather than
+        /// foreach over a copy of the pairs.
+        ///
+        /// Two bytes for the length reaches 65,535, which no address comes near (bech32 stops at
+        /// 90 characters, base58 at 35). It throws rather than truncating if something else ends up
+        /// in here, because a silently clipped address reads back as a valid-looking different one.
+        ///
+        /// FileMode.Create, so a run with fewer entries than the last leaves a shorter file rather
+        /// than the tail of the old one behind the new ones - and the count in the header would
+        /// disagree with that tail in any case.
+        /// </summary>
+        public static void saveLookupAddress(SortedList<long, string> lookupAddress, string path)
+        {
+            if (lookupAddress == null)
+            {
+                throw new ArgumentNullException(nameof(lookupAddress));
+            }
+
+            string? directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);      // no-op when it is already there
+            }
+
+            using var file = new FileStream(path, FileMode.Create, FileAccess.Write,
+                                            FileShare.None, 1 << 20);
+
+            // One megabyte holds the largest record this format allows (10 + 65,535) many times
+            // over, so the flush below always leaves room for the record that triggered it and
+            // nothing has to handle a record split across two buffers.
+            byte[] buffer = new byte[1 << 20];
+
+            System.Text.Encoding.ASCII.GetBytes(LookupAddressMagic, buffer.AsSpan(0, 8));
+            BinaryPrimitives.WriteInt32LittleEndian(buffer.AsSpan(8, 4), lookupAddress.Count);
+            int at = 12;
+
+            for (int i = 0; i < lookupAddress.Count; i++)
+            {
+                long key = lookupAddress.GetKeyAtIndex(i);
+                string address = lookupAddress.GetValueAtIndex(i);
+
+                if (address == null)
+                {
+                    throw new InvalidDataException("key " + key + " is in the table with a null"
+                                                   + " address - addLookupAddress never puts one"
+                                                   + " there, so something else did");
+                }
+
+                int bytes = System.Text.Encoding.UTF8.GetByteCount(address);
+                if (bytes > ushort.MaxValue)
+                {
+                    throw new InvalidDataException("the address under key " + key + " is " + bytes
+                                                   + " UTF-8 bytes, past the " + ushort.MaxValue
+                                                   + " this format's length field holds");
+                }
+
+                if (at + 10 + bytes > buffer.Length)
+                {
+                    file.Write(buffer, 0, at);
+                    at = 0;
+                }
+
+                BinaryPrimitives.WriteInt64LittleEndian(buffer.AsSpan(at, 8), key);
+                BinaryPrimitives.WriteUInt16LittleEndian(buffer.AsSpan(at + 8, 2), (ushort)bytes);
+                System.Text.Encoding.UTF8.GetBytes(address, buffer.AsSpan(at + 10, bytes));
+                at += 10 + bytes;
+            }
+
+            if (at > 0)
+            {
+                file.Write(buffer, 0, at);
+            }
+        }
+
+        /// <summary>
+        /// The table back, in the same order and with the same contents saveLookupAddress wrote.
+        ///
+        /// The capacity comes out of the header so the two backing arrays are allocated once rather
+        /// than doubling their way up to a few million entries, and the keys arrive in ascending
+        /// order, so every Add binary-searches to the end of the array and copies nothing down.
+        /// That is the cheap path through SortedList.Add and the reason nothing has to be sorted
+        /// afterwards; keys out of order would still load, only each one shifting the tail of both
+        /// arrays along, which is what turns the load into an O(n^2) walk.
+        ///
+        /// So the order is checked rather than assumed. An out of order or duplicate key means the
+        /// file was written by something other than saveLookupAddress, and what Add would do about
+        /// a duplicate is throw anyway, with a message about a key rather than about the file.
+        ///
+        /// ReadExactly rather than Read throughout: a FileStream is allowed to hand back fewer
+        /// bytes than were asked for, and a loop that assumes otherwise reads a shifted file and
+        /// finds nothing wrong with it.
+        /// </summary>
+        public static SortedList<long, string> loadLookupAddress(string path)
+        {
+            if (!File.Exists(path))
+            {
+                throw new FileNotFoundException("there is no lookupAddress file at " + path, path);
+            }
+
+            using var file = new FileStream(path, FileMode.Open, FileAccess.Read,
+                                            FileShare.Read, 1 << 20);
+
+            byte[] header = new byte[12];
+            file.ReadExactly(header, 0, 12);
+
+            string magic = System.Text.Encoding.ASCII.GetString(header, 0, 8);
+            if (magic != LookupAddressMagic)
+            {
+                throw new InvalidDataException(path + " starts with \"" + magic + "\" rather than \""
+                                               + LookupAddressMagic + "\" - it is not one of these"
+                                               + " files");
+            }
+
+            int count = BinaryPrimitives.ReadInt32LittleEndian(header.AsSpan(8, 4));
+
+            // The smallest a record can be is the ten byte fixed part with an empty address, so a
+            // count that could not fit in what is left of the file is a corrupt header - worth
+            // catching before it is handed to the constructor below as a capacity to allocate.
+            if (count < 0 || (long)count * 10 > file.Length - 12)
+            {
+                throw new InvalidDataException(path + " claims " + count + " entries, which will"
+                                               + " not fit in its " + file.Length + " bytes - the"
+                                               + " header is corrupt or the file is truncated");
+            }
+
+            var loaded = new SortedList<long, string>(count);
+
+            byte[] record = new byte[ushort.MaxValue];
+            long previousKey = 0;
+
+            for (int i = 0; i < count; i++)
+            {
+                file.ReadExactly(record, 0, 10);
+
+                long key = BinaryPrimitives.ReadInt64LittleEndian(record.AsSpan(0, 8));
+                int bytes = BinaryPrimitives.ReadUInt16LittleEndian(record.AsSpan(8, 2));
+
+                if (i > 0 && key <= previousKey)
+                {
+                    throw new InvalidDataException("entry " + i + " of " + path + " has key " + key
+                                                   + " after key " + previousKey + " - these are"
+                                                   + " written in ascending order, so the file is"
+                                                   + " not one of these or it is damaged");
+                }
+                previousKey = key;
+
+                file.ReadExactly(record, 0, bytes);
+                loaded.Add(key, System.Text.Encoding.UTF8.GetString(record, 0, bytes));
+            }
+
+            return loaded;
+        }
+
+        public static void addToSimpleTransactionsList(simpleTransaction toAdd, 
+            List<KeyValuePair<int, simpleTransaction[]>> simpleTransactionsList, int[] simpleTransactionsListCounts)
+        {
+
+            // https://www.blockchain.com/explorer/addresses/btc/1BcSvC5fS4KN3ywRgHPxymoUkAfvxUL2PH
+            //1BcSvC5fS4KN3ywRgHPxymoUkAfvxUL2PH adress got 0 btc sent to it and thats only transaction
+
+
+            // The first list with room left in it. What decides that is how full list h is, which
+            // is simpleTransactionsListCounts[h] - not simpleTransactionsList.Count, which is how
+            // many lists there are and stays at MAXLISTSsimpleTransactionsList for good.
+            int index = 0;
+            while (index < MAXLISTSsimpleTransactionsList)
+            {
+                if (simpleTransactionsListCounts[index] < MAXSIZEsimpleTransactionsList)
+                {
+                    break;
+                }
+                index++;
+            }
+
+            // Falling off the end of that loop is every list full, and the only way h reaches
+            // MAXLISTSsimpleTransactionsList - the break above leaves it on a list with room.
+            if (index == MAXLISTSsimpleTransactionsList)
+            {
+                throw new Exception("too many simple transactions: all "
+                                    + MAXLISTSsimpleTransactionsList + " lists of "
+                                    + MAXSIZEsimpleTransactionsList + " are full");
+            }
+
+            // List h, and the count for list h. Both indexed the same way, which is the whole
+            // point - the list is built in key order, so simpleTransactionsList[h].Key is h.
+            simpleTransactionsList[index].Value[simpleTransactionsListCounts[index]] = toAdd;
+            simpleTransactionsListCounts[index]++;
+        }
+
+
+        /// <summary>
+        /// The same table as CollectAddressBalances, built from a flat list of transactions
+        /// instead of from the blocks - for when the transactions have already been collected and
+        /// there is no reason to go back over the block bytes a second time.
+        ///
+        /// Written out again rather than sharing an inner loop with the block version on purpose.
+        /// Two independent walks that agree on several million balances is worth something; two
+        /// calls into one shared routine only ever prove that the routine is deterministic.
+        /// CompareAddressBalances below is what makes that worth having.
+        ///
+        /// What it needs of the list is exactly what a chain gives it:
+        ///
+        ///   - every transaction once, and
+        ///   - in chain order, blocks by height and transactions in the order their block carries
+        ///     them, because an input can only be attributed after the output it spends has been
+        ///     seen - including when that output was made by an earlier transaction in the same
+        ///     block, which is legal and common.
+        ///
+        /// Height comes off Transaction.BlockHeight, which ParseBlock stamps on the way past. A
+        /// transaction on its own does not otherwise know where it came from, so a list built by
+        /// anything that does not go through ParseBlock will have zeros there and every balance
+        /// will claim to have been first seen at height 0.
+        ///
+        /// A list that repeats transactions is the failure this is most likely to meet, and it is
+        /// silent: the same output credited twice inflates a balance, and the input that spends it
+        /// only finds it once. So outputs whose outpoint is already in the set are counted and
+        /// reported. Over the first 200,000 blocks that count should be exactly 2 - the BIP30
+        /// coinbases at heights 91880 and 91842, each a byte-identical repeat of an earlier block's
+        /// and each overwriting an unspent output that then ceased to exist. Anything above 2 is
+        /// the list, not the chain.
+        ///
+        /// Every rule about what a balance means is the same as the block version - read the
+        /// comment on CollectAddressBalances for the mining rewards, the unattributable scripts
+        /// and the reconciliation.
+        ///
+        /// The walk itself is two sides per transaction. The sending address is the one that owns
+        /// the output an input spends, and it is only knowable by looking that output up in the
+        /// unspent set; the receiving address is the one an output's script names, and it is
+        /// right there in the transaction. Both sides can come up empty and the loops below say
+        /// where: a coinbase input has no sender because the satoshis are new, an input naming an
+        /// output this walk never saw has a sender that cannot be identified from here, and a
+        /// script ScriptToAddress cannot read has no address on either side of it. Satoshis with
+        /// no address are still counted - into the mined, fee and unattributed totals - so that
+        /// the reconciliation at the end covers every satoshi the walk touched, not only the ones
+        /// that landed on a name.
+        /// </summary>
+        /// <param name="transactions">Every transaction once, in chain order.</param>
+        /// <param name="heightLimit">Stop before this height, so 200000 means the first 200,000
+        /// blocks: heights 0 to 199999.</param>
+        /// <param name="csvPath">Where to write the full table, or null to only return it.</param>
+        public static List<AddressBalance> CollectAddressBalancesFromTransactions(
+            List<Transaction> transactions, int heightLimit, string? csvPath,
+            List<KeyValuePair<int, simpleTransaction[]>> simpleTransactionsList, int[] simpleTransactionsListCounts, SortedList<long, string> lookupAddress
+            )
+        {
+
+
+
+            var balances = new Dictionary<string, AddressBalance>();
+            var unspent = new Dictionary<OutPoint, UnspentOutput>();
+
+            long transactionOrdinal = 0;
+
+            int walked = 0;
+            int coinbaseInputs = 0;
+            int unresolvedInputs = 0;
+            int outputsWithNoAddress = 0;
+            int spentWithNoAddress = 0;
+            ulong satoshisPaidToNoAddress = 0;
+            ulong satoshisSentFromNoAddress = 0;
+            int duplicateOutpoints = 0;
+            int lastHeight = -1;
+            int outOfOrder = 0;
+
+            ulong mined = 0;
+            ulong fees = 0;
+
+            var clock = Stopwatch.StartNew();
+
+            Int64 count = 0;
+            foreach (Transaction tx in transactions)
+            {
+                if (tx.BlockHeight >= heightLimit)
+                {
+                    continue;
+                }
+
+                // Order is the one thing about this list that cannot be checked after the fact -
+                // a balance built out of order is just wrong, with nothing about it to say so. A
+                // height that goes backwards is proof of it; a repeated height is normal, since a
+                // block holds many transactions.
+                if (tx.BlockHeight < lastHeight)
+                {
+                    outOfOrder++;
+                }
+                lastHeight = tx.BlockHeight;
+
+                transactionOrdinal++;
+                walked++;
+
+                bool coinbase = false;
+
+                // The two sides of one transaction. Satoshis leave the addresses that own the
+                // outputs this transaction spends, and arrive at the addresses named by the
+                // outputs it makes. Neither side is guaranteed to have an address on it, so these
+                // two totals are kept apart from what could actually be debited and credited.
+                ulong satoshisSentBySenders = 0;
+                ulong satoshisPaidToReceivers = 0;
+
+                if (count++ % 150000 == 0)
+                    Console.WriteLine(count + " of 7 million first 200000 blocks" + "end: " + transactions.Count) ;
+
+
+                List<string> sentOut = new List<string>();
+                List<Int64>  amountsOut = new List<Int64>();
+                List<string> gotIn = new List<string>();
+                List<Int64> amountsIn = new List<Int64>();
+
+
+                // ---- the sending side: which address the satoshis are leaving ----------------
+                //
+                // An input carries neither an address nor an amount. All it names is the output
+                // it spends, by txid and index - the sending address and the number of satoshis
+                // being sent are both read back out of that earlier output, which is the whole
+                // reason this walk keeps an unspent set. Three kinds of input have no sender to
+                // debit, and each is counted where it turns up below:
+                //
+                //   - a coinbase input, which spends nothing because the satoshis are new,
+                //   - an input naming an output this walk never saw, leaving both the sending
+                //     address and the amount unknowable from here, and
+                //   - an input spending an output whose script named no address.
+                for (int n = 0; n < tx.Inputs.Count; n++)
+                {
+                    Transaction.TxInput input = tx.Inputs[n];
+
+                    // NO SENDING ADDRESS - newly mined satoshis, out of nobody's balance.
+                    if (IsAllZero(input.TxId))
+                    {
+                        coinbase = true;
+                        coinbaseInputs++;
+                        continue;
+                    }
+
+                    var outputBeingSpent = new OutPoint(input.TxId, input.Vout);
+
+                    UnspentOutput sourceOutput;
+                    if (!unspent.TryGetValue(outputBeingSpent, out sourceOutput))
+                    {
+                        // NO SENDING ADDRESS - the output being spent was never seen, so nothing
+                        // here knows whose it was or how much it held.
+                        unresolvedInputs++;
+                        continue;
+                    }
+
+                    // Whoever it belonged to, the satoshis are on the move: the output is spent
+                    // and off the unspent set for good.
+                    unspent.Remove(outputBeingSpent);
+
+                    // THE ADDRESS SENDING THE SATOSHIS OUT, and how many it is sending.
+                    string? sendingAddress = sourceOutput.Address;
+                    ulong satoshisSent = sourceOutput.Value;
+
+                    sentOut.Add(sendingAddress!);
+                    amountsOut.Add((Int64)satoshisSent);
+
+                    satoshisSentBySenders += satoshisSent;
+
+                    // NO SENDING ADDRESS - the amount is known, but the script it sat in named
+                    // no address, so there is no balance to take it out of.
+                    if (sendingAddress == null)
+                    {
+                        spentWithNoAddress++;
+                        satoshisSentFromNoAddress += satoshisSent;
+                        continue;
+                    }
+
+                    // sendingAddress is down satoshisSent.
+                    AddressBalance sender = Touch(balances, sendingAddress, tx.BlockHeight,
+                                                  transactionOrdinal);
+                    sender.Balance -= (long)satoshisSent;
+                }
+
+                // ---- the receiving side: which address the satoshis are going to -------------
+                //
+                // An output does carry its amount, and its script usually names who may spend it
+                // next, which is the address receiving the satoshis. Not always: a script
+                // ScriptToAddress cannot read - an OP_RETURN, a non-standard script, a form it
+                // does not cover - leaves satoshis with no receiver to credit. They are real
+                // satoshis either way, and still spendable by whoever holds the key, so they go
+                // into the unspent set under a null address rather than being dropped - and an
+                // input spending them later comes back out of it as a sender with no address.
+                for (int n = 0; n < tx.Outputs.Count; n++)
+                {
+                    Transaction.TxOutput output = tx.Outputs[n];
+
+                    // THE ADDRESS GETTING THE SATOSHIS, and how many it is getting.
+                    string? receivingAddress = ScriptToAddress(output.ScriptPubKey);
+                    ulong satoshisReceived = output.Value;
+
+                    if (receivingAddress != null)
+                    {
+                        gotIn.Add(receivingAddress);
+                        amountsIn.Add((Int64)satoshisReceived);
+                    }
+
+                    satoshisPaidToReceivers += satoshisReceived;
+
+                    if (receivingAddress == null)
+                    {
+                        // NO RECEIVING ADDRESS - nothing to credit, only to count.
+                        outputsWithNoAddress++;
+                        satoshisPaidToNoAddress += satoshisReceived;
+                    }
+
+                    // The output is spendable from here on, and it is what will tell a later
+                    // input who its sender was: the receiving address on this side is the sending
+                    // address on that one, whenever something comes along and spends it.
+                    var outputBeingMade = new OutPoint(tx.Hash, (uint)n);
+                    var nowUnspent = new UnspentOutput
+                    {
+                        Address = receivingAddress,
+                        Value = satoshisReceived
+                    };
+
+                    // TryAdd first because it is one lookup and the answer is yes almost every
+                    // time. The overwrite on the other branch is deliberate and is what Bitcoin
+                    // Core itself did with the BIP30 duplicates - the newer output wins and the
+                    // older one is gone.
+                    if (!unspent.TryAdd(outputBeingMade, nowUnspent))
+                    {
+                        duplicateOutpoints++;
+                        unspent[outputBeingMade] = nowUnspent;
+                    }
+
+                    if (receivingAddress == null)
+                    {
+                        continue;
+                    }
+
+                    // receivingAddress is up satoshisReceived.
+                    AddressBalance receiver = Touch(balances, receivingAddress, tx.BlockHeight,
+                                                    transactionOrdinal);
+                    receiver.Balance += (long)satoshisReceived;
+                }
+
+                if (gotIn.Count == 1 && sentOut.Count == 0)
+                {
+                    //byte[] zeroAddress = new byte[8];
+                    //zeroAddress[0] = 0; zeroAddress[1] = 0; zeroAddress[2] = 0; zeroAddress[3] = 0;
+                    //zeroAddress[4] = 0; zeroAddress[5] = 0; zeroAddress[6] = 0; zeroAddress[7] = 0;
+
+                    List<simpleTransaction> trans = new List<simpleTransaction>();
+
+                    simpleTransaction t = new simpleTransaction();
+                    t.From = 0;
+                    t.AmountAndBlock = t.computeAmountAndBlock(amountsIn.FirstOrDefault(), 0);
+                    if (amountsIn.FirstOrDefault() > ((Int64)2) << simpleTransaction.AmountBits)
+                    {
+                        throw new Exception("Bad");
+                    }
+                    t.To = t.shrinkStringAddress(gotIn.FirstOrDefault()!);
+                    
+                    addLookupAddress(t.To, gotIn.FirstOrDefault()!, lookupAddress);
+                    
+                    trans.Add(t);
+
+
+                    foreach (var t2 in trans)
+                    {
+                        
+                        addToSimpleTransactionsList(t2, simpleTransactionsList, simpleTransactionsListCounts);
+                        //simpleTransactionsList.First().Value[simpleTransactionsListCounts[0]] = t2;
+                        //simpleTransactionsListCounts[0]++;
+                    }
+                }
+                else if (gotIn.Count == 1 && sentOut.Count == 1)
+                {
+                    if (amountsIn.FirstOrDefault() < ((Int64)2) << simpleTransaction.AmountBits)
+                    {
+
+                        if (sentOut.FirstOrDefault() == null)
+                        {
+                            // m-ca4ab30f8a7cb85b4ac824a090a51f72
+                            //https://blockchair.com/bitcoin/transaction/23b397edccd3740a74adb603c9756370fafcde9bcc4483eb271ecad09a94dd63
+
+                            // unknown here
+                            //https://www.blockchain.com/explorer/transactions/btc/23b397edccd3740a74adb603c9756370fafcde9bcc4483eb271ecad09a94dd63
+                        }
+                        else {
+                            List<simpleTransaction> trans = new List<simpleTransaction>();
+
+                            simpleTransaction t = new simpleTransaction();
+                            t.From = t.shrinkStringAddress(sentOut.FirstOrDefault()!);
+                            t.AmountAndBlock = t.computeAmountAndBlock(amountsIn.FirstOrDefault(), 0);
+
+                            if (amountsIn.FirstOrDefault() > ((Int64)2) << simpleTransaction.AmountBits)
+                            {
+                                throw new Exception("Bad");
+                            }
+                            t.To = t.shrinkStringAddress(gotIn.FirstOrDefault()!);
+
+
+                            addLookupAddress(t.To, gotIn.FirstOrDefault()!, lookupAddress);
+                            addLookupAddress(t.From, sentOut.FirstOrDefault()!, lookupAddress);
+
+                            trans.Add(t);
+
+
+                            foreach (var t2 in trans)
+                            {
+                                addToSimpleTransactionsList(t2, simpleTransactionsList, simpleTransactionsListCounts);
+                                //simpleTransactionsList.First().Value[simpleTransactionsListCounts[0]] = t2;
+                                //simpleTransactionsListCounts[0]++;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("big transfer single in single out " + simpleTransactionsListCounts[0]);
+                        // 11k transfer https://www.blockchain.com/explorer/transactions/btc/1aae9d58e8826aa65ce985061a78642ec2d920e8a8bb1679aae35f7d496d25b4
+                    }
+
+                }
+                else if (gotIn.Count == 1 && sentOut.Count >= 2)
+                {
+                    if (amountsIn.FirstOrDefault() < ((Int64)2) << simpleTransaction.AmountBits)
+                    {
+                        var x = sentOut.ToArray();
+                        var y = amountsOut.ToArray();
+                        //https://www.blockchain.com/explorer/transactions/btc/4d6edbeb62735d45ff1565385a8b0045f066055c9425e21540ea7a8060f08bf2
+                        for (int i = 0; i < sentOut.Count; i++)
+                        {
+
+                            if (y[i] > ((Int64)2) << simpleTransaction.AmountBits)
+                            {
+                                // https://www.blockchain.com/explorer/transactions/btc/1aae9d58e8826aa65ce985061a78642ec2d920e8a8bb1679aae35f7d496d25b4
+                                throw new Exception("Bad");
+                            }
+                            simpleTransaction t = new simpleTransaction();
+
+                            if (x[i] == null)
+                            {
+                                // unknown in and then unknown out
+                                //https://www.blockchain.com/explorer/addresses/btc/1BGTiCvuU1ocR5QFbqRfmRkjSF6BVdyeP5
+
+
+                                //https://www.blockchain.com/explorer/transactions/btc/4f1433d6433d3ce8a877519ba9ddc310dbee96dba939aca0dbef0176a3563436
+                                Console.WriteLine("weird https://www.blockchain.com/explorer/transactions/btc/4f1433d6433d3ce8a877519ba9ddc310dbee96dba939aca0dbef0176a3563436");
+                            }
+                            else 
+                            { 
+                                t.From = t.shrinkStringAddress(x[i]);
+                                t.AmountAndBlock = t.computeAmountAndBlock(y[i], 0);
+                                t.To = t.shrinkStringAddress(gotIn.FirstOrDefault()!);
+
+
+                                addLookupAddress(t.To, gotIn.FirstOrDefault()!, lookupAddress); // redundant adds
+                                addLookupAddress(t.From, x[i], lookupAddress);
+
+
+                                // https://www.blockchain.com/explorer/transactions/btc/a3b0e9e7cddbbe78270fa4182a7675ff00b92872d8df7d14265a2b1e379a9d33
+                                addToSimpleTransactionsList(t, simpleTransactionsList, simpleTransactionsListCounts);
+                                //simpleTransactionsList.First().Value[simpleTransactionsListCounts[0]] = t;
+                                //simpleTransactionsListCounts[0]++;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("big transfer single in" + simpleTransactionsListCounts[0]);
+                        // 11k transfer https://www.blockchain.com/explorer/transactions/btc/1aae9d58e8826aa65ce985061a78642ec2d920e8a8bb1679aae35f7d496d25b4
+                    }
+                }
+                else if (gotIn.Count >= 2 && sentOut.Count == 1)
+                {
+                    if (amountsOut.FirstOrDefault() < ((Int64)2) << simpleTransaction.AmountBits)
+                    {
+                        var x = gotIn.ToArray();
+                        var y = amountsIn.ToArray();
+
+
+                        if (sentOut.FirstOrDefault() == null)
+                        {
+                            //https://blockchair.com/bitcoin/transaction/81b0bb7be25a496cb12ed5acf834cbaebb8e5dfaffc9c996f33fe24f0f54c883
+                            // s-1428b6578b0073fcd6871a28b99bf95b
+                            Console.WriteLine("weird address");
+
+                        }
+                        else
+                        {
+                            for (int i = 0; i < gotIn.Count; i++)
+                            {
+
+                                if (y[i] > ((Int64)2) << simpleTransaction.AmountBits)
+                                {
+                                    throw new Exception("Bad");
+                                }
+                                simpleTransaction t = new simpleTransaction();
+
+                                t.From = t.shrinkStringAddress(sentOut.FirstOrDefault());
+                                t.AmountAndBlock = t.computeAmountAndBlock(y[i], 0);
+                                t.To = t.shrinkStringAddress(x[i]);
+
+                                addLookupAddress(t.From, sentOut.FirstOrDefault()!, lookupAddress); // redundant adds
+                                addLookupAddress(t.To, x[i], lookupAddress);
+
+
+
+                                addToSimpleTransactionsList(t, simpleTransactionsList, simpleTransactionsListCounts);
+                                //simpleTransactionsList.First().Value[simpleTransactionsListCounts[0]] = t;
+                                //simpleTransactionsListCounts[0]++;
+
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("big transfer single out");
+                        // 11k transfer https://www.blockchain.com/explorer/transactions/btc/1aae9d58e8826aa65ce985061a78642ec2d920e8a8bb1679aae35f7d496d25b4
+                    }
+                }
+
+                else if (gotIn.Count >= 2 && sentOut.Count >= 2)
+                {
+                    var senders = sentOut.ToArray();
+                    var sent = amountsOut.ToArray();
+                    var receivers = gotIn.ToArray();
+                    var received = amountsIn.ToArray();
+
+                    Int64 totalSent = 0;
+                    for (int i = 0; i < sent.Length; i++)
+                    {
+                        totalSent += sent[i];
+                    }
+
+                    // The weights are shares of totalSent, so a total of zero has no shares to
+                    // take. It means two inputs that between them spent nothing, which the chain
+                    // does not contain and which would divide by zero below.
+                    if (totalSent <= 0)
+                    {
+                        throw new Exception("two senders spending " + totalSent
+                                            + " satoshis between them");
+                    }
+
+                    for (int j = 0; j < receivers.Length; j++)
+                    {
+                        // received[j] * sent[i] overflows Int64 long before either factor does:
+                        // the largest output on the chain is 5e13 satoshis and a pooled input side
+                        // can reach 2.1e15, whose product needs about a hundred bits. Int128 holds
+                        // that intermediate exactly, and the quotient is back under 2.1e15, so the
+                        // cast back out of it cannot truncate.
+                        Int64 attributed = 0;
+                        for (int i = 0; i < senders.Length; i++)
+                        {
+                            // Integer division rounds every share down, so the shares sum to as
+                            // much as one satoshi per sender short of received[j]. The last sender
+                            // is handed the remainder rather than its own quotient, which is what
+                            // makes one receiver's records add up to exactly what it received.
+                            Int64 share;
+                            if (i == senders.Length - 1)
+                            {
+                                share = received[j] - attributed;
+                            }
+                            else
+                            {
+                                share = (Int64)((Int128)received[j] * sent[i] / totalSent);
+                            }
+                            attributed += share;
+
+                            simpleTransaction t = new simpleTransaction();
+
+                            if (senders[i] == null )//&& (i==90 || i==89))
+                            {
+                                // doesnt happen much
+                                Console.WriteLine("look into 90th" +  "https://www.blockchain.com/explorer/addresses/btc/1LYvWcThP3kkiSvbd3ZYVvQiMhNpMVHHnj");
+                            }
+                            else
+                            {
+                                t.From = t.shrinkStringAddress(senders[i]);
+                                t.AmountAndBlock = t.computeAmountAndBlock(share, 0);
+                                t.To = t.shrinkStringAddress(receivers[j]);
+
+                                addLookupAddress(t.From, senders[i], lookupAddress); // redundant adds
+                                addLookupAddress(t.To, receivers[j], lookupAddress); // redundant adds
+                                
+
+                                // https://www.blockchain.com/explorer/transactions/btc/28204cad1d7fc1d199e8ef4fa22f182de6258a3eaafe1bbe56ebdcacd3069a5f
+                                addToSimpleTransactionsList(t, simpleTransactionsList, simpleTransactionsListCounts);
+                                //simpleTransactionsList.First().Value[simpleTransactionsListCounts[0]] = t;
+                                //simpleTransactionsListCounts[0]++;
+                            }
+                        }
+                    }
+                }
+
+                if (coinbase)
+                {
+                    // Nothing was sent to it, so everything it pays out is new: the block subsidy
+                    // plus the fees every other transaction in the block left behind.
+                    mined += satoshisPaidToReceivers;
+                }
+                else if (satoshisSentBySenders >= satoshisPaidToReceivers)
+                {
+                    // More left the senders than reached a receiver. The difference is the fee -
+                    // it goes to no address here, and comes back out of this block's coinbase.
+                    fees += satoshisSentBySenders - satoshisPaidToReceivers;
+                }
+            }
+
+            clock.Stop();
+
+            var list = new List<AddressBalance>(balances.Count);
+            long balanceTotal = 0;
+            int negative = 0;
+
+            foreach (KeyValuePair<string, AddressBalance> entry in balances)
+            {
+                list.Add(entry.Value);
+                balanceTotal += entry.Value.Balance;
+                if (entry.Value.Balance < 0)
+                {
+                    negative++;
+                }
+            }
+
+            list.Sort((a, b) =>
+            {
+                if (a.Balance != b.Balance)
+                {
+                    return b.Balance.CompareTo(a.Balance);
+                }
+                return string.CompareOrdinal(a.Address, b.Address);
+            });
+
+            ulong unspentWithNoAddress = 0;
+            foreach (KeyValuePair<OutPoint, UnspentOutput> entry in unspent)
+            {
+                if (entry.Value.Address == null)
+                {
+                    unspentWithNoAddress += entry.Value.Value;
+                }
+            }
+
+            Console.WriteLine("address balances from " + transactions.Count
+                              + " collected transactions, below height " + heightLimit + ":");
+            Console.WriteLine("  transactions : " + walked + " walked in "
+                              + clock.Elapsed.TotalSeconds.ToString("F1") + "s");
+            Console.WriteLine("  addresses    : " + list.Count);
+            Console.WriteLine("  coinbase in  : " + coinbaseInputs
+                              + " inputs mint new satoshis, so there is no sending address");
+            Console.WriteLine("  mined        : " + (mined / 100000000.0).ToString("F8")
+                              + " BTC paid out by coinbases, fees included");
+            Console.WriteLine("  balances     : " + (balanceTotal / 100000000.0).ToString("F8") + " BTC held");
+            Console.WriteLine("  utxo set     : " + unspent.Count + " unspent outputs");
+
+            if (outputsWithNoAddress > 0)
+            {
+                Console.WriteLine("  no receiver  : " + outputsWithNoAddress
+                                  + " outputs pay a script with no address in it, holding "
+                                  + (satoshisPaidToNoAddress / 100000000.0).ToString("F8") + " BTC");
+            }
+
+            if (spentWithNoAddress > 0)
+            {
+                Console.WriteLine("  no sender    : " + spentWithNoAddress
+                                  + " of those were later spent, sending "
+                                  + (satoshisSentFromNoAddress / 100000000.0).ToString("F8")
+                                  + " BTC out of no address");
+            }
+
+            if (duplicateOutpoints > 2)
+            {
+                Console.WriteLine("  DUPLICATES   : " + duplicateOutpoints
+                                  + " outputs were made on an outpoint already in the set - the"
+                                  + " chain accounts for 2 of those below height 200000, so this"
+                                  + " list repeats transactions and every number here is wrong");
+            }
+            else if (duplicateOutpoints > 0)
+            {
+                Console.WriteLine("  duplicates   : " + duplicateOutpoints
+                                  + " outpoints made twice, which is the BIP30 pair and expected");
+            }
+
+            if (outOfOrder > 0)
+            {
+                Console.WriteLine("  OUT OF ORDER : " + outOfOrder
+                                  + " transactions arrived at a lower height than the one before"
+                                  + " them - the list is not in chain order and the balances are wrong");
+            }
+
+            if (unresolvedInputs > 0)
+            {
+                Console.WriteLine("  unresolved   : " + unresolvedInputs
+                                  + " inputs spend an output this walk never saw, so neither the"
+                                  + " sending address nor the amount is known - the balances"
+                                  + " above them are too high and the list did not start at 0");
+            }
+            else
+            {
+                long expected = (long)mined - (long)fees;
+                long actual = balanceTotal + (long)unspentWithNoAddress;
+
+                Console.WriteLine("  fees         : " + (fees / 100000000.0).ToString("F8")
+                                  + " BTC spent but not paid out, re-mined inside the coinbases");
+                Console.WriteLine("  unattributed : " + (unspentWithNoAddress / 100000000.0).ToString("F8")
+                                  + " BTC unspent in scripts with no address");
+
+                if (expected == actual)
+                {
+                    Console.WriteLine("  reconciles   : mined - fees == balances + unattributed");
+                }
+                else
+                {
+                    Console.WriteLine("  MISMATCH     : mined - fees is " + expected
+                                      + " sats, balances + unattributed is " + actual
+                                      + ", off by " + (expected - actual));
+                }
+            }
+
+            if (negative > 0)
+            {
+                Console.WriteLine("  negative     : " + negative
+                                  + " addresses spent more than they were paid, which cannot happen"
+                                  + " on a list that started at height 0");
+            }
+
+            int show = 20;
+            if (list.Count < show)
+            {
+                show = list.Count;
+            }
+
+            for (int i = 0; i < show; i++)
+            {
+                AddressBalance held = list[i];
+                Console.WriteLine("  " + held.Address.PadRight(35)
+                                  + (held.Balance / 100000000.0).ToString("F8").PadLeft(18) + " BTC"
+                                  + held.Transactions.ToString().PadLeft(8) + " txs"
+                                  + "  heights " + held.FirstHeight + " to " + held.LastHeight);
+            }
+
+            if (false)
+            {
+                string? directory = Path.GetDirectoryName(csvPath);
+                if (directory != null)
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                using (var writer = new StreamWriter(csvPath, false))
+                {
+                    writer.WriteLine("address,balance,firstHeight,lastHeight,transactions");
+                    foreach (AddressBalance held in list)
+                    {
+                        writer.WriteLine(held.Address + "," + held.Balance + "," + held.FirstHeight
+                                         + "," + held.LastHeight + "," + held.Transactions);
+                    }
+                }
+
+                Console.WriteLine("  written      : " + csvPath + " (balance in satoshis)");
+            }
+
+
+            if (false)
+            {
+
+                //Save ALL Transactions ToS qlite
+                //
+                // Every transaction this walk saw, in one database, with the address on either
+                // side of it - the same tx and txaddr tables SaveTransactionsToSqlite builds per
+                // 50,000 block segment, except that this is the whole run in a single file.
+                //
+                // It walks the list again rather than filing rows as the balances were built,
+                // because resolving an input consumes the output it points at: the set above no
+                // longer holds anything that was spent along the way, so from here the only way
+                // to know whose an input was is to build the set a second time.
+                string allTxDbPath = "C:\\btcblock\\rocksdb\\transactions_all.db";
+
+                // Which is the other reason to let this one go first. It is a few million entries
+                // and nothing needs it now - the reconciliation above is done - so dropping the
+                // reference leaves the second walk building its set in that room rather than
+                // beside it. Clear() would keep the storage; a new dictionary hands it back.
+                unspent = new Dictionary<OutPoint, UnspentOutput>();
+
+                SaveAllTransactionsToSqlite(allTxDbPath, transactions, heightLimit);
+            }
+
+            return list;
+        }
+
+        /// <summary>
+        /// Holds two balance tables against each other and says whether they are the same table.
+        ///
+        /// This is the reason the list version is written out separately. Both walks apply the
+        /// same rules to the same chain, so every address in one has to appear in the other with
+        /// the same balance, the same two heights and the same transaction count. If they do, the
+        /// list was fed in whole and in order and both implementations are doing what they say.
+        /// If they do not, the differences say where to look - a balance out by exactly the value
+        /// of one output is a different problem from a first-seen height of 0.
+        ///
+        /// Returns the number of differences, so 0 means the two agree.
+        /// </summary>
+        public static int CompareAddressBalances(List<AddressBalance> left, string leftName,
+                                                 List<AddressBalance> right, string rightName)
+        {
+            var byAddress = new Dictionary<string, AddressBalance>(left.Count);
+            foreach (AddressBalance held in left)
+            {
+                byAddress[held.Address] = held;
+            }
+
+            int differences = 0;
+            int missing = 0;
+            int shown = 0;
+
+            Console.WriteLine("comparing " + leftName + " (" + left.Count + " addresses) against "
+                              + rightName + " (" + right.Count + " addresses):");
+
+            foreach (AddressBalance held in right)
+            {
+                AddressBalance? other;
+                if (!byAddress.TryGetValue(held.Address, out other))
+                {
+                    missing++;
+                    if (shown < 10)
+                    {
+                        shown++;
+                        Console.WriteLine("  only in " + rightName + " : " + held.Address
+                                          + " " + held.Balance + " sats");
+                    }
+                    continue;
+                }
+
+                // Seen, so what is left in the dictionary at the end is whatever only the left
+                // side had.
+                byAddress.Remove(held.Address);
+
+                if (other.Balance == held.Balance && other.FirstHeight == held.FirstHeight
+                    && other.LastHeight == held.LastHeight && other.Transactions == held.Transactions)
+                {
+                    continue;
+                }
+
+                differences++;
+                if (shown < 10)
+                {
+                    shown++;
+                    Console.WriteLine("  differs      : " + held.Address);
+                    Console.WriteLine("    " + leftName.PadRight(12) + " balance " + other.Balance
+                                      + " heights " + other.FirstHeight + "-" + other.LastHeight
+                                      + " txs " + other.Transactions);
+                    Console.WriteLine("    " + rightName.PadRight(12) + " balance " + held.Balance
+                                      + " heights " + held.FirstHeight + "-" + held.LastHeight
+                                      + " txs " + held.Transactions);
+                }
+            }
+
+            foreach (KeyValuePair<string, AddressBalance> entry in byAddress)
+            {
+                missing++;
+                if (shown < 10)
+                {
+                    shown++;
+                    Console.WriteLine("  only in " + leftName + " : " + entry.Key
+                                      + " " + entry.Value.Balance + " sats");
+                }
+            }
+
+            differences += missing;
+
+            if (differences == 0)
+            {
+                Console.WriteLine("  identical    : two independent walks, same " + left.Count
+                                  + " addresses, same balances");
+            }
+            else
+            {
+                Console.WriteLine("  differences  : " + differences + " in total, " + missing
+                                  + " of them an address one walk has and the other does not");
+            }
+
+            return differences;
+        }
+
+        // ------------------------------------------------------------------------------------
+        // RocksDB transaction index
+        // ------------------------------------------------------------------------------------
+
+        //   't' + txid[32]   -> height[4] offset[4] length[4]
+        //   'M'              -> how many records were written
+        //
+        // The transactions themselves are not copied in here. Every one of them is already on
+        // disk inside the block that carries it, so a store of the bytes would be a second copy
+        // of the block store wearing different keys. What is not already anywhere is *where* a
+        // given txid lives, and that is twelve bytes: the height of its block, and the span it
+        // occupies in that block's serialization.
+        //
+        // Reading one back is this store for the locator, the block store for the block, then a
+        // slice - which is the same trade Bitcoin Core makes with -txindex.
+        const byte TxPrefix = (byte)'t';
+
+        /// <summary>Bytes in a locator: height[4] offset[4] length[4], all little endian.</summary>
+        const int TxLocatorBytes = 12;
+
+        /// <summary>Transactions per write batch. They are small, so this can be far bigger than
+        /// the block equivalent before a batch is worth anything in memory.</summary>
+        const int TransactionsPerBatch = 20000;
+
+        static byte[] TxKey(byte[] internalTxid)
+        {
+            byte[] key = new byte[33];
+            key[0] = TxPrefix;
+            internalTxid.CopyTo(key, 1);
+            return key;
+        }
+
+        /// <summary>Hashes are already uniformly random, so the first four bytes make a fine key.</summary>
+        sealed class ByteArrayComparer : IEqualityComparer<byte[]>
+        {
+            public bool Equals(byte[]? x, byte[]? y)
+            {
+                return BytesEqual(x, y);
+            }
+
+            public int GetHashCode(byte[] obj)
+            {
+                if (obj.Length >= 4) return BinaryPrimitives.ReadInt32LittleEndian(obj.AsSpan(0, 4));
+                return obj.Length;
+            }
+        }
+
+        /// <summary>
+        /// Files every transaction in a run of blocks into its own RocksDB store, keyed by txid,
+        /// with the block height and the span the transaction occupies in that block as the value.
+        ///
+        /// The blocks are parsed here rather than taken already parsed, because the offsets are
+        /// what this is really after and only the parse knows them - ReadTransaction records the
+        /// span it walked, and nothing upstream of it does.
+        ///
+        /// Duplicate txids are real, and this stretch of the chain has them: before BIP30 was
+        /// enforced a coinbase could repeat an earlier one byte for byte, so blocks 91842 and
+        /// 91880 carry transactions with the same txids as 91812 and 91722. The later record wins
+        /// the key, which is the same answer the chain itself gives, and the count is reported.
+        ///
+        /// Returns how many transactions were written - not how many keys the store ends up with,
+        /// which is lower by exactly the duplicate count.
+        /// </summary>
+        public static int SaveTransactionsToRocksDb(string dbPath, List<BlockRaw> blocks, int verifyEvery = 5000)
+        {
+            Directory.CreateDirectory(dbPath);
+
+            var options = new DbOptions().SetCreateIfMissing(true);
+
+            int written = 0;
+            int duplicates = 0;
+            var seen = new HashSet<byte[]>(new ByteArrayComparer());
+
+            // Sampled on the way past and checked once everything is written. Holding the block
+            // itself rather than a copy of the bytes - it is already in memory either way.
+            var samples = new List<(byte[] Txid, BlockRaw Block, int Height, int Offset, int Length)>();
+
+            using (RocksDb db = RocksDb.Open(options, dbPath))
+            {
+                var batch = new WriteBatch();
+                int inBatch = 0;
+
+                foreach (BlockRaw raw in blocks)
+                {
+                    Block parsed = ParseBlock(raw, raw.BlockIndex);
+
+                    foreach (Transaction tx in parsed.Transactions)
+                    {
+                        byte[] locator = new byte[TxLocatorBytes];
+                        BinaryPrimitives.WriteInt32LittleEndian(locator.AsSpan(0, 4), tx.BlockHeight);
+                        BinaryPrimitives.WriteInt32LittleEndian(locator.AsSpan(4, 4), tx.ByteOffset);
+                        BinaryPrimitives.WriteInt32LittleEndian(locator.AsSpan(8, 4), tx.ByteLength);
+
+                        batch.Put(TxKey(tx.Hash), locator);
+
+                        if (!seen.Add(tx.Hash))
+                        {
+                            duplicates++;
+                            Console.WriteLine("  duplicate txid at height " + tx.BlockHeight
+                                              + ": " + tx.GetHashAsString());
+                        }
+
+                        if (verifyEvery > 0 && written % verifyEvery == 0)
+                        {
+                            samples.Add((tx.Hash, raw, tx.BlockHeight, tx.ByteOffset, tx.ByteLength));
+                        }
+
+                        written++;
+                        inBatch++;
+
+                        if (inBatch >= TransactionsPerBatch)
+                        {
+                            db.Write(batch);
+                            batch.Dispose();
+                            batch = new WriteBatch();
+                            inBatch = 0;
+                        }
+                    }
+                }
+
+                if (inBatch > 0)
+                {
+                    db.Write(batch);
+                }
+                batch.Dispose();
+
+                byte[] meta = new byte[4];
+                BinaryPrimitives.WriteInt32LittleEndian(meta, written);
+                db.Put(MetaKey, meta);
+
+                int roundTripFailures = 0;
+                foreach (var sample in samples)
+                {
+                    byte[]? stored = db.Get(TxKey(sample.Txid));
+                    if (stored == null || stored.Length != TxLocatorBytes)
+                    {
+                        roundTripFailures++;
+                        Console.Error.WriteLine("txid " + ToDisplayHex(sample.Txid) + " is not in the store");
+                        continue;
+                    }
+
+                    int height = BinaryPrimitives.ReadInt32LittleEndian(stored.AsSpan(0, 4));
+                    int offset = BinaryPrimitives.ReadInt32LittleEndian(stored.AsSpan(4, 4));
+                    int length = BinaryPrimitives.ReadInt32LittleEndian(stored.AsSpan(8, 4));
+
+                    // A duplicate txid legitimately reads back as the later block's locator, so
+                    // only the ones that were not repeated are held to the exact values written.
+                    if (height != sample.Height || offset != sample.Offset || length != sample.Length)
+                    {
+                        roundTripFailures++;
+                        Console.Error.WriteLine("locator for " + ToDisplayHex(sample.Txid) + " came back as "
+                                                + height + "/" + offset + "/" + length + ", wrote "
+                                                + sample.Height + "/" + sample.Offset + "/" + sample.Length);
+                        continue;
+                    }
+
+                    if (offset < 0 || length < 1 || offset + length > sample.Block.Raw.Length)
+                    {
+                        roundTripFailures++;
+                        Console.Error.WriteLine("locator for " + ToDisplayHex(sample.Txid)
+                                                + " points outside its " + sample.Block.Raw.Length + " byte block");
+                        continue;
+                    }
+
+                    // Cut the transaction back out and check it is the one the key names. Only
+                    // sound without a witness: the txid skips the marker, flag and witness stacks,
+                    // so on a segwit transaction the slice hashes to the wtxid instead. Byte 4 of
+                    // the slice is the segwit marker when there is one - nothing below height
+                    // 481,824 has it, but this store does not have to know that.
+                    ReadOnlySpan<byte> slice = sample.Block.Raw.AsSpan(offset, length);
+                    if (slice.Length > 4 && slice[4] != 0x00)
+                    {
+                        byte[] hashed = DoubleSha256(sample.Block.Raw, offset, length);
+                        if (!hashed.AsSpan().SequenceEqual(sample.Txid))
+                        {
+                            roundTripFailures++;
+                            Console.Error.WriteLine("the bytes at the locator for " + ToDisplayHex(sample.Txid)
+                                                    + " hash to " + ToDisplayHex(hashed));
+                        }
+                    }
+                }
+
+                Console.WriteLine("transactions : " + written + " written to " + dbPath);
+                if (duplicates > 0)
+                {
+                    Console.WriteLine("  duplicates : " + duplicates + ", so the store holds "
+                                      + (written - duplicates) + " keys");
+                }
+                Console.WriteLine("  round trip : " + (samples.Count - roundTripFailures)
+                                  + " of " + samples.Count + " sampled transactions match");
+            }
+
+            return written;
+        }
+
+
+        /// <summary>
+        /// Looks a txid up in a transaction store and cuts the transaction out of the block bytes
+        /// handed in. The block has to be the one at the height the locator names - this does not
+        /// open the block store, so the caller decides where the block comes from.
+        ///
+        /// Null when the store does not hold that txid. Opens the database for the one read, so
+        /// this is for spot checks rather than a loop.
+        /// </summary>
+        public static byte[]? ReadTransactionFromRocksDb(string dbPath, byte[] internalTxid, BlockRaw block)
+        {
+            if (!Directory.Exists(dbPath))
+            {
+                throw new DirectoryNotFoundException("no rocksdb store at " + dbPath
+                                                     + " - nothing has been saved there yet");
+            }
+
+            var options = new DbOptions().SetCreateIfMissing(false);
+
+            using (RocksDb db = RocksDb.Open(options, dbPath))
+            {
+                byte[]? stored = db.Get(TxKey(internalTxid));
+                if (stored == null || stored.Length != TxLocatorBytes) return null;
+
+                int height = BinaryPrimitives.ReadInt32LittleEndian(stored.AsSpan(0, 4));
+                int offset = BinaryPrimitives.ReadInt32LittleEndian(stored.AsSpan(4, 4));
+                int length = BinaryPrimitives.ReadInt32LittleEndian(stored.AsSpan(8, 4));
+
+                if (height != block.BlockIndex)
+                {
+                    throw new ArgumentException("that transaction is in the block at height " + height
+                                                + ", not the one at " + block.BlockIndex, nameof(block));
+                }
+                if (offset < 0 || length < 1 || offset + length > block.Raw.Length)
+                {
+                    throw new InvalidDataException("the locator points outside the block it names");
+                }
+
+                return block.Raw.AsSpan(offset, length).ToArray();
+            }
+        }
+
+        // ------------------------------------------------------------------------------------
+        // SQLite transaction index, searchable by address
+        // ------------------------------------------------------------------------------------
+
+        /// <summary>What an unspent output pays and to whom, held until something spends it.</summary>
+        public struct UnspentOutput
+        {
+            public string? Address;
+            public ulong Value;
+        }
+
+        /// <summary>
+        /// An outpoint as a dictionary key, held as four longs and an int rather than a 36 byte
+        /// array. A struct key lives inside the dictionary's own storage, so the UTXO set costs no
+        /// per-entry allocation at all - which matters when every output in the chain puts one in
+        /// and every input takes one out.
+        ///
+        /// Hashing off the first eight bytes of the txid is enough: it is already a hash.
+        /// </summary>
+        public readonly struct OutPoint : IEquatable<OutPoint>
+        {
+            readonly ulong _a, _b, _c, _d;
+            readonly uint _vout;
+
+            public OutPoint(ReadOnlySpan<byte> txid32, uint vout)
+            {
+                _a = BinaryPrimitives.ReadUInt64LittleEndian(txid32.Slice(0, 8));
+                _b = BinaryPrimitives.ReadUInt64LittleEndian(txid32.Slice(8, 8));
+                _c = BinaryPrimitives.ReadUInt64LittleEndian(txid32.Slice(16, 8));
+                _d = BinaryPrimitives.ReadUInt64LittleEndian(txid32.Slice(24, 8));
+                _vout = vout;
+            }
+
+            public bool Equals(OutPoint other)
+            {
+                return _a == other._a && _b == other._b && _c == other._c
+                       && _d == other._d && _vout == other._vout;
+            }
+
+            public override bool Equals(object? obj)
+            {
+                if (obj is OutPoint other) return Equals(other);
+                return false;
+            }
+
+            public override int GetHashCode()
+            {
+                return HashCode.Combine(_a, _vout);
+            }
+        }
+
+        static void Execute(SqliteConnection conn, string sql)
+        {
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            cmd.ExecuteNonQuery();
+        }
+
+        /// <summary>
+        /// A prepared insert with its parameters held onto, so the hot loop sets values and
+        /// executes rather than rebuilding a command per row.
+        ///
+        /// Deliberately one row per execute. Multi-row inserts - the usual advice for a bulk load
+        /// - were measured here and made it worse, monotonically: on 670 blocks of blk00060 the
+        /// same work took 10.8s at one row a statement, 10.7s at four, 11.8s at sixteen and 17.9s
+        /// at sixty-four. Microsoft.Data.Sqlite binds parameters by name, so a statement with 64
+        /// tuples pays for 384 named bindings per execute and gives back only the statement steps
+        /// it saved. The win in this method came from elsewhere - see Base58Encode.
+        /// </summary>
+        sealed class PreparedInsert : IDisposable
+        {
+            readonly SqliteCommand _command;
+            readonly SqliteParameter[] _params;
+
+            public PreparedInsert(SqliteConnection conn, SqliteTransaction work, string table,
+                                  string[] columns, SqliteType[] types)
+            {
+                _params = new SqliteParameter[columns.Length];
+
+                var text = new System.Text.StringBuilder();
+                text.Append("insert into ").Append(table).Append(" (")
+                    .Append(string.Join(", ", columns)).Append(") values (");
+
+                _command = conn.CreateCommand();
+                _command.Transaction = work;
+                for (int c = 0; c < columns.Length; c++)
+                {
+                    if (c > 0) text.Append(',');
+                    string name = "$c" + c;
+                    text.Append(name);
+                    _params[c] = _command.Parameters.Add(name, types[c]);
+                }
+                text.Append(')');
+
+                _command.CommandText = text.ToString();
+                _command.Prepare();
+            }
+
+            public void Set(int column, long value)
+            {
+                _params[column].Value = value;
+            }
+
+            public void Set(int column, byte[] value)
+            {
+                _params[column].Value = value;
+            }
+
+            public void SetText(int column, string? value)
+            {
+                if (value == null)
+                {
+                    _params[column].Value = DBNull.Value;
+                }
+                else
+                {
+                    _params[column].Value = value;
+                }
+            }
+
+            public void SetNull(int column)
+            {
+                _params[column].Value = DBNull.Value;
+            }
+
+            public void Write()
+            {
+                _command.ExecuteNonQuery();
+            }
+
+            public void Dispose()
+            {
+                _command.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// Writes a run of blocks into a SQLite database as transactions plus the addresses on
+        /// either side of them, indexed so either side can be searched.
+        ///
+        ///   tx      one row per transaction: txid, height, and its span in the block
+        ///   txaddr  one row per address a transaction touches, direction 0 for the address it
+        ///           came FROM and 1 for an address it went TO, with the value in satoshis
+        ///
+        /// The to-address is in the output script and falls straight out of it. The from-address
+        /// does not exist anywhere in the transaction: an input names an outpoint, and the address
+        /// being spent lives in the output that outpoint points at, in some earlier block. So the
+        /// only way to fill it in is to carry the unspent outputs along as the chain is walked -
+        /// which is what `unspent` is, and why it has to be passed in rather than built per call.
+        /// Blocks must arrive in height order across calls or an input will look up an outpoint
+        /// that has not been seen yet.
+        ///
+        /// Passing the same dictionary through every segment in turn makes it a real UTXO set:
+        /// outputs go in, inputs take them back out, so it stays the size of the unspent set
+        /// rather than growing to every output ever made.
+        ///
+        /// An input whose outpoint is not in there gets its row with a null address rather than
+        /// being dropped - that is what the start of a run that did not begin at height 0 looks
+        /// like, and the count is reported so it cannot pass unnoticed.
+        ///
+        /// Returns how many transactions were written.
+        /// </summary>
+        public static int SaveTransactionsToSqlite(string dbPath, List<BlockRaw> blocks,
+                                                   Dictionary<OutPoint, UnspentOutput> unspent)
+        {
+            string? directory = Path.GetDirectoryName(dbPath);
+            if (directory != null) Directory.CreateDirectory(directory);
+
+            // Rebuilt from scratch: the tables have no key to update against, so a second run over
+            // an existing file would file every transaction twice.
+            if (File.Exists(dbPath))
+            {
+                Console.WriteLine("  replacing the existing " + Path.GetFileName(dbPath));
+                File.Delete(dbPath);
+            }
+
+            int transactions = 0;
+            int addressRows = 0;
+            int coinbaseInputs = 0;
+            int unresolvedInputs = 0;
+            int scriptsWithNoAddress = 0;
+
+            using var conn = new SqliteConnection("Data Source=" + dbPath);
+            conn.Open();
+
+            // This is a derived index - everything in it can be rebuilt from the blocks - so
+            // durability is worth nothing here and speed is worth a lot.
+            Execute(conn, "pragma journal_mode = off");
+            Execute(conn, "pragma synchronous = off");
+            Execute(conn, "pragma temp_store = memory");
+            Execute(conn, "pragma cache_size = -200000");
+
+            Execute(conn, @"create table tx (
+                                txid   blob    not null,
+                                height integer not null,
+                                offset integer not null,
+                                length integer not null)");
+
+            Execute(conn, @"create table txaddr (
+                                txid      blob    not null,
+                                height    integer not null,
+                                direction integer not null,
+                                n         integer not null,
+                                address   text,
+                                value     integer)");
+
+            using (var work = conn.BeginTransaction())
+            {
+                using var txRows = new PreparedInsert(conn, work, "tx",
+                    new[] { "txid", "height", "offset", "length" },
+                    new[] { SqliteType.Blob, SqliteType.Integer, SqliteType.Integer, SqliteType.Integer });
+
+                using var addrRows = new PreparedInsert(conn, work, "txaddr",
+                    new[] { "txid", "height", "direction", "n", "address", "value" },
+                    new[] { SqliteType.Blob, SqliteType.Integer, SqliteType.Integer,
+                            SqliteType.Integer, SqliteType.Text, SqliteType.Integer });
+
+                foreach (BlockRaw raw in blocks)
+                {
+                    Block parsed = ParseBlock(raw, raw.BlockIndex);
+
+                    foreach (Transaction tx in parsed.Transactions)
+                    {
+                        txRows.Set(0, tx.Hash);
+                        txRows.Set(1, tx.BlockHeight);
+                        txRows.Set(2, tx.ByteOffset);
+                        txRows.Set(3, tx.ByteLength);
+                        txRows.Write();
+                        transactions++;
+
+                        // Inputs first, so an output this transaction creates cannot be mistaken
+                        // for one of the outputs it spends.
+                        for (int n = 0; n < tx.Inputs.Count; n++)
+                        {
+                            Transaction.TxInput input = tx.Inputs[n];
+
+                            // A coinbase spends nothing and names the all-zero outpoint. There is
+                            // no from-address to look up, so it gets no row.
+                            if (IsAllZero(input.TxId))
+                            {
+                                coinbaseInputs++;
+                                continue;
+                            }
+
+                            var spending = new OutPoint(input.TxId, input.Vout);
+
+                            addrRows.Set(0, tx.Hash);
+                            addrRows.Set(1, tx.BlockHeight);
+                            addrRows.Set(2, 0);
+                            addrRows.Set(3, n);
+
+                            UnspentOutput prev;
+                            if (unspent.TryGetValue(spending, out prev))
+                            {
+                                addrRows.SetText(4, prev.Address);
+                                addrRows.Set(5, (long)prev.Value);
+
+                                // Spent now, so it leaves the set. This is what keeps the
+                                // dictionary the size of the UTXO set instead of the size of
+                                // every output the chain has ever made.
+                                unspent.Remove(spending);
+                            }
+                            else
+                            {
+                                unresolvedInputs++;
+                                addrRows.SetNull(4);
+                                addrRows.SetNull(5);
+                            }
+
+                            addrRows.Write();
+                            addressRows++;
+                        }
+
+                        for (int n = 0; n < tx.Outputs.Count; n++)
+                        {
+                            Transaction.TxOutput output = tx.Outputs[n];
+                            string? address = ScriptToAddress(output.ScriptPubKey);
+                            if (address == null) scriptsWithNoAddress++;
+
+                            addrRows.Set(0, tx.Hash);
+                            addrRows.Set(1, tx.BlockHeight);
+                            addrRows.Set(2, 1);
+                            addrRows.Set(3, n);
+                            addrRows.SetText(4, address);
+                            addrRows.Set(5, (long)output.Value);
+                            addrRows.Write();
+                            addressRows++;
+
+                            unspent[new OutPoint(tx.Hash, (uint)n)] =
+                                new UnspentOutput { Address = address, Value = output.Value };
+                        }
+                    }
+                }
+                work.Commit();
+            }
+
+            // Built after the rows are in. Maintaining an index through several million inserts
+            // costs far more than building it once over the finished table.
+            //
+            // Partial, so there is genuinely an index on the from-address and another on the
+            // to-address rather than one covering both: a lookup by direction only walks the rows
+            // of that direction, and each index is a fraction of the size of the combined one.
+            Execute(conn, "create index ix_txaddr_from on txaddr(address) where direction = 0");
+            Execute(conn, "create index ix_txaddr_to   on txaddr(address) where direction = 1");
+            Execute(conn, "create index ix_txaddr_txid on txaddr(txid)");
+            Execute(conn, "create index ix_tx_txid     on tx(txid)");
+
+            Console.WriteLine("  transactions : " + transactions + ", address rows " + addressRows);
+            Console.WriteLine("  coinbase in  : " + coinbaseInputs + " (no from-address to look up)");
+            if (unresolvedInputs > 0)
+            {
+                Console.WriteLine("  unresolved   : " + unresolvedInputs
+                                  + " inputs spend an output this walk never saw");
+            }
+            if (scriptsWithNoAddress > 0)
+            {
+                Console.WriteLine("  no address   : " + scriptsWithNoAddress
+                                  + " outputs pay a script with no address in it");
+            }
+            Console.WriteLine("  utxo set     : " + unspent.Count + " unspent outputs carried forward");
+
+            return transactions;
+        }
+
+        /// <summary>
+        /// The whole chain's transactions in one SQLite file, from a list of transactions rather
+        /// than from the blocks - the same two tables and the same four indexes SaveTransactionsToSqlite
+        /// builds, so a query written against the segmented databases runs here unchanged.
+        ///
+        /// The difference between the two is what carries the UTXO set. SaveTransactionsToSqlite
+        /// is called once per 50,000 block segment and is handed the set from outside, because an
+        /// input in segment 4 spends an output made in segment 1 and only a set that has been
+        /// walking along since height 0 still knows whose it was. This does the whole run in one
+        /// call, so it owns its set and builds it as it goes.
+        ///
+        /// Which is also why it is a second walk when it follows the balance table: resolving an
+        /// input consumes the output it points at, so by the time a balance walk has finished, the
+        /// set it used no longer holds the outputs that were spent along the way and cannot answer
+        /// the same questions twice. The only way to have them again is to walk again.
+        ///
+        /// Wants the same list the balance walk wants - every transaction once, in chain order,
+        /// with Transaction.BlockHeight stamped by ParseBlock. Anything out of order shows up as
+        /// unresolved inputs rather than as an error.
+        ///
+        /// Returns how many transactions were written.
+        /// </summary>
+        /// <param name="dbPath">The file to build. Deleted first if it exists.</param>
+        /// <param name="transactions">Every transaction once, in chain order.</param>
+        /// <param name="heightLimit">Stop before this height, so 200000 means the first 200,000
+        /// blocks: heights 0 to 199999.</param>
+        public static int SaveAllTransactionsToSqlite(string dbPath, List<Transaction> transactions,
+                                                      int heightLimit)
+        {
+            string? directory = Path.GetDirectoryName(dbPath);
+            if (directory != null) Directory.CreateDirectory(directory);
+
+            // Rebuilt from scratch: the tables have no key to update against, so a second run over
+            // an existing file would file every transaction twice.
+            if (File.Exists(dbPath))
+            {
+                Console.WriteLine("  replacing the existing " + Path.GetFileName(dbPath));
+                File.Delete(dbPath);
+            }
+
+            // Its own, because this call is the whole chain rather than one segment of it.
+            var unspent = new Dictionary<OutPoint, UnspentOutput>();
+
+            int written = 0;
+            int addressRows = 0;
+            int coinbaseInputs = 0;
+            int unresolvedInputs = 0;
+            int scriptsWithNoAddress = 0;
+
+            var clock = Stopwatch.StartNew();
+
+            using var conn = new SqliteConnection("Data Source=" + dbPath);
+            conn.Open();
+
+            // A derived index - everything in it can be rebuilt from the blocks - so durability is
+            // worth nothing here and speed is worth a lot.
+            Execute(conn, "pragma journal_mode = off");
+            Execute(conn, "pragma synchronous = off");
+            Execute(conn, "pragma temp_store = memory");
+            Execute(conn, "pragma cache_size = -200000");
+
+            Execute(conn, @"create table tx (
+                                txid   blob    not null,
+                                height integer not null,
+                                offset integer not null,
+                                length integer not null)");
+
+            Execute(conn, @"create table txaddr (
+                                txid      blob    not null,
+                                height    integer not null,
+                                direction integer not null,
+                                n         integer not null,
+                                address   text,
+                                value     integer)");
+
+            using (var work = conn.BeginTransaction())
+            {
+                using var txRows = new PreparedInsert(conn, work, "tx",
+                    new[] { "txid", "height", "offset", "length" },
+                    new[] { SqliteType.Blob, SqliteType.Integer, SqliteType.Integer, SqliteType.Integer });
+
+                using var addrRows = new PreparedInsert(conn, work, "txaddr",
+                    new[] { "txid", "height", "direction", "n", "address", "value" },
+                    new[] { SqliteType.Blob, SqliteType.Integer, SqliteType.Integer,
+                            SqliteType.Integer, SqliteType.Text, SqliteType.Integer });
+
+                foreach (Transaction tx in transactions)
+                {
+                    if (tx.BlockHeight >= heightLimit)
+                    {
+                        continue;
+                    }
+
+                    // The txid goes in as the 32 bytes it is stored in on disk, little endian,
+                    // which is the order the rocksdb index and the segmented databases use too.
+                    // A query holding the hash an explorer shows has to reverse it first.
+                    txRows.Set(0, tx.Hash);
+                    txRows.Set(1, tx.BlockHeight);
+                    txRows.Set(2, tx.ByteOffset);
+                    txRows.Set(3, tx.ByteLength);
+                    txRows.Write();
+                    written++;
+
+                    // One line per half million, because this is a long enough job that a console
+                    // saying nothing for an hour is indistinguishable from a hung one.
+                    if (written % 500000 == 0)
+                    {
+                        Console.WriteLine("  " + written + " transactions, height " + tx.BlockHeight
+                                          + ", " + clock.Elapsed.TotalSeconds.ToString("F0") + "s");
+                    }
+
+                    // Inputs first, so an output this transaction creates cannot be taken for one
+                    // of the outputs it spends.
+                    for (int n = 0; n < tx.Inputs.Count; n++)
+                    {
+                        Transaction.TxInput input = tx.Inputs[n];
+
+                        // A coinbase spends nothing and names the all-zero outpoint. There is no
+                        // from-address to look up, so it gets no row.
+                        if (IsAllZero(input.TxId))
+                        {
+                            coinbaseInputs++;
+                            continue;
+                        }
+
+                        var spending = new OutPoint(input.TxId, input.Vout);
+
+                        addrRows.Set(0, tx.Hash);
+                        addrRows.Set(1, tx.BlockHeight);
+                        addrRows.Set(2, 0);
+                        addrRows.Set(3, n);
+
+                        UnspentOutput previous;
+                        if (unspent.TryGetValue(spending, out previous))
+                        {
+                            addrRows.SetText(4, previous.Address);
+                            addrRows.Set(5, (long)previous.Value);
+
+                            // Spent now, so it leaves the set. This is what keeps the dictionary
+                            // the size of the UTXO set instead of the size of every output the
+                            // chain has ever made.
+                            unspent.Remove(spending);
+                        }
+                        else
+                        {
+                            unresolvedInputs++;
+                            addrRows.SetNull(4);
+                            addrRows.SetNull(5);
+                        }
+
+                        addrRows.Write();
+                        addressRows++;
+                    }
+
+                    for (int n = 0; n < tx.Outputs.Count; n++)
+                    {
+                        Transaction.TxOutput output = tx.Outputs[n];
+                        string? address = ScriptToAddress(output.ScriptPubKey);
+                        if (address == null) scriptsWithNoAddress++;
+
+                        addrRows.Set(0, tx.Hash);
+                        addrRows.Set(1, tx.BlockHeight);
+                        addrRows.Set(2, 1);
+                        addrRows.Set(3, n);
+                        addrRows.SetText(4, address);
+                        addrRows.Set(5, (long)output.Value);
+                        addrRows.Write();
+                        addressRows++;
+
+                        unspent[new OutPoint(tx.Hash, (uint)n)] =
+                            new UnspentOutput { Address = address, Value = output.Value };
+                    }
+                }
+
+                work.Commit();
+            }
+
+            // Built after the rows are in. Maintaining an index through several million inserts
+            // costs far more than building it once over the finished table - and over the whole
+            // chain rather than a segment of it, this is the part of the call that takes the time.
+            Console.WriteLine("  indexing     : " + addressRows + " address rows, "
+                              + clock.Elapsed.TotalSeconds.ToString("F0") + "s so far");
+
+            // Partial, so there is genuinely an index on the from-address and another on the
+            // to-address rather than one covering both: a lookup by direction only walks the rows
+            // of that direction, and each index is a fraction of the size of the combined one.
+            Execute(conn, "create index ix_txaddr_from on txaddr(address) where direction = 0");
+            Execute(conn, "create index ix_txaddr_to   on txaddr(address) where direction = 1");
+            Execute(conn, "create index ix_txaddr_txid on txaddr(txid)");
+            Execute(conn, "create index ix_tx_txid     on tx(txid)");
+
+            clock.Stop();
+
+            Console.WriteLine("  transactions : " + written + ", address rows " + addressRows
+                              + ", in " + clock.Elapsed.TotalSeconds.ToString("F1") + "s");
+            Console.WriteLine("  coinbase in  : " + coinbaseInputs + " (no from-address to look up)");
+            if (unresolvedInputs > 0)
+            {
+                Console.WriteLine("  unresolved   : " + unresolvedInputs
+                                  + " inputs spend an output this walk never saw - either the list"
+                                  + " does not start at height 0 or it is not in chain order");
+            }
+            if (scriptsWithNoAddress > 0)
+            {
+                Console.WriteLine("  no address   : " + scriptsWithNoAddress
+                                  + " outputs pay a script with no address in it");
+            }
+            Console.WriteLine("  utxo set     : " + unspent.Count + " unspent outputs at the end");
+
+            var built = new FileInfo(dbPath);
+            Console.WriteLine("  written      : " + dbPath + ", "
+                              + (built.Length / 1024.0 / 1024.0).ToString("F0") + " MB");
+
+            return written;
+        }
+
+        // ------------------------------------------------------------------------------------
+        // SQLite transaction index, read back
+        // ------------------------------------------------------------------------------------
+
+        /// <summary>One side of one transaction, the way the txaddr table holds it: an output
+        /// paying an address, or an input spending one.
+        ///
+        /// A struct, and deliberately. A whole-chain database has thirty million of these rows in
+        /// it, and as a class that is thirty million object headers - most of a gigabyte spent
+        /// before any of the four fields is counted, and thirty million more objects for the
+        /// collector to walk. In an array of structs they cost their fields and the array.</summary>
+        public readonly struct StoredTxAddress
+        {
+            /// <summary>Whose side this is, or null where the database has none: an output whose
+            /// script names no address, or an input the writer could not resolve. Value tells
+            /// those two apart - see below.
+            ///
+            /// Every row naming the same address shares one string instance, so the addresses of
+            /// the whole chain cost one copy each rather than one per row.</summary>
+            public readonly string? Address;
+
+            /// <summary>Satoshis on this side, or -1 where the row holds null, which the writer
+            /// files for an input whose output it never saw. So a null address with a value is an
+            /// output with no address in its script, or an input spending one; a null address with
+            /// -1 is an input nothing at all could be said about.</summary>
+            public readonly long Value;
+
+            /// <summary>Which input, or which output, counted from 0 within its own side.</summary>
+            public readonly int N;
+
+            /// <summary>True for an output - direction 1 in the table - false for an input.</summary>
+            public readonly bool IsOutput;
+
+            public StoredTxAddress(string? address, long value, int n, bool isOutput)
+            {
+                Address = address;
+                Value = value;
+                N = n;
+                IsOutput = isOutput;
+            }
+        }
+
+        /// <summary>
+        /// One transaction as the database holds it, which is less than a <see cref="Transaction"/>
+        /// in one way and more in another.
+        ///
+        /// Less, because nothing in the file can rebuild one. There are no scripts, no outpoints,
+        /// no sequence numbers and no bytes - only the txid, the locator saying where the bytes
+        /// are in the block that carries them, and one row per side.
+        ///
+        /// More, because the address on an input is not in the transaction at all. It belongs to
+        /// the output being spent, made in some earlier block, and the writer did that lookup on
+        /// the way in with the UTXO set it was carrying anyway. Reading it back therefore needs no
+        /// set and no earlier blocks: a row says who paid whom on its own.
+        /// </summary>
+        public sealed class StoredTransaction
+        {
+            /// <summary>The txid, little endian, the order it is stored in on disk and the order
+            /// Transaction.Hash uses. Explorers show it reversed - GetDisplayTxid does that.</summary>
+            public byte[] Txid = Array.Empty<byte>();
+
+            /// <summary>The height of the block that carries it.</summary>
+            public int Height;
+
+            /// <summary>Where its bytes start inside that block's serialization, counted from byte
+            /// 0 of the block - Transaction.ByteOffset, filed unchanged.</summary>
+            public int Offset;
+
+            /// <summary>How many bytes it occupies there. With Offset and the block this cuts the
+            /// transaction back out of the chain, which is the only way to reach anything the
+            /// database does not itself hold.</summary>
+            public int Length;
+
+            /// <summary>Inputs first, then outputs, in the order the writer filed them - which is
+            /// the order they appear in the transaction, each side numbered by N.</summary>
+            public StoredTxAddress[] Addresses = Array.Empty<StoredTxAddress>();
+
+            /// <summary>The txid the way an explorer shows it.</summary>
+            public string GetDisplayTxid()
+            {
+                return ToDisplayHex(Txid);
+            }
+
+            /// <summary>
+            /// Whether this is its block's coinbase, which the rows answer without being asked: a
+            /// coinbase spends the all-zero outpoint and the writer files no row for it, while
+            /// every other input gets a row whether or not its address could be resolved. So a
+            /// transaction with no input row is a coinbase, and nothing else is.
+            /// </summary>
+            public bool IsCoinbase()
+            {
+                foreach (StoredTxAddress side in Addresses)
+                {
+                    if (!side.IsOutput)
+                    {
+                        return false;
+                    }
+                }
+                return true;
+            }
+        }
+
+        /// <summary>
+        /// Every transaction in the database, in the order it was written, which is chain order.
+        ///
+        /// The two tables are joined by position rather than by SQL, and that is the whole trick
+        /// of this method. SaveAllTransactionsToSqlite filled both in one pass - a transaction's
+        /// row into tx, then that transaction's rows into txaddr, then the next transaction - so
+        /// reading both in rowid order walks the same transactions in the same sequence, and a
+        /// transaction's address rows are exactly the run of txaddr rows sitting under its txid.
+        /// Both statements are plain scans (EXPLAIN QUERY PLAN says SCAN tx and SCAN txaddr with
+        /// no sort - "order by rowid" on a rowid table is the order a scan comes back in anyway),
+        /// so six gigabytes are read once, sequentially, and no index is touched.
+        ///
+        /// Joining them in SQL is the obvious way to write this and is the thing to avoid: seven
+        /// million index lookups scattered through a file far larger than memory, against one pass
+        /// that never seeks.
+        ///
+        /// The txid is compared on every row rather than trusted, because a positional join fails
+        /// silently. If the two orders ever disagree the run boundaries land in the wrong places
+        /// and every transaction after that point carries somebody else's addresses, with nothing
+        /// about the result looking wrong. A transaction coming out with no rows at all is that
+        /// failure - a transaction with no outputs is not valid and cannot be in here - so it
+        /// throws rather than handing back a chain that quietly means nothing.
+        ///
+        /// Streamed, so a caller that only wants to count something never holds the chain;
+        /// LoadAllTransactionsFromSqlite below is the one that costs memory. Address strings are
+        /// pooled across the whole read, so the pool is held for as long as the enumeration runs -
+        /// a few million strings against the thirty million rows that share them.
+        /// </summary>
+        /// <param name="dbPath">The file SaveAllTransactionsToSqlite wrote.</param>
+        /// <param name="heightLimit">Stop before this height, so 200000 means the first 200,000
+        /// blocks: heights 0 to 199999.</param>
+        public static IEnumerable<StoredTransaction> StreamAllTransactionsFromSqlite(string dbPath,
+                                                                                     int heightLimit)
+        {
+            if (!File.Exists(dbPath))
+            {
+                throw new FileNotFoundException("there is no transaction database at " + dbPath, dbPath);
+            }
+
+            // Read-only, and a connection each. SQLite will step two statements over one
+            // connection quite happily, but two connections keep the scans sharing nothing at all,
+            // and read-only says outright that a load cannot be what corrupts the file.
+            string connectionText = "Data Source=" + dbPath + ";Mode=ReadOnly";
+
+            using var txConn = new SqliteConnection(connectionText);
+            using var addrConn = new SqliteConnection(connectionText);
+            txConn.Open();
+            addrConn.Open();
+
+            using var txCmd = txConn.CreateCommand();
+            txCmd.CommandText = "select txid, height, offset, length from tx"
+                                + " where height < $limit order by rowid";
+            txCmd.Parameters.AddWithValue("$limit", heightLimit);
+
+            using var addrCmd = addrConn.CreateCommand();
+            addrCmd.CommandText = "select txid, direction, n, address, value from txaddr"
+                                  + " where height < $limit order by rowid";
+            addrCmd.Parameters.AddWithValue("$limit", heightLimit);
+
+            using var txRows = txCmd.ExecuteReader();
+            using var addrRows = addrCmd.ExecuteReader();
+
+            // The txid of the address row waiting to be attached, read into a buffer that is kept
+            // rather than allocated per row - thirty million 32 byte arrays that live long enough
+            // to be compared once and dropped is work worth not doing.
+            byte[] pendingTxid = new byte[32];
+            bool pending = addrRows.Read();
+            if (pending)
+            {
+                addrRows.GetBytes(0, 0, pendingTxid, 0, 32);
+            }
+
+            // One instance per distinct address, handed to every row that names it.
+            var pool = new Dictionary<string, string>();
+
+            // Refilled per transaction and copied out at the size it ended up, so the arrays that
+            // are kept are exact and this list's spare capacity is the only slack in the read.
+            var sides = new List<StoredTxAddress>(8);
+
+            while (txRows.Read())
+            {
+                byte[] txid = new byte[32];
+                txRows.GetBytes(0, 0, txid, 0, 32);
+
+                var stored = new StoredTransaction();
+                stored.Txid = txid;
+                stored.Height = txRows.GetInt32(1);
+                stored.Offset = txRows.GetInt32(2);
+                stored.Length = txRows.GetInt32(3);
+
+                sides.Clear();
+
+                while (pending && SameTxid(pendingTxid, txid))
+                {
+                    long direction = addrRows.GetInt64(1);
+                    int n = addrRows.GetInt32(2);
+
+                    string? address = null;
+                    if (!addrRows.IsDBNull(3))
+                    {
+                        string read = addrRows.GetString(3);
+
+                        string? shared;
+                        if (pool.TryGetValue(read, out shared))
+                        {
+                            address = shared;
+                        }
+                        else
+                        {
+                            pool.Add(read, read);
+                            address = read;
+                        }
+                    }
+
+                    long value = -1;
+                    if (!addrRows.IsDBNull(4))
+                    {
+                        value = addrRows.GetInt64(4);
+                    }
+
+                    bool isOutput = false;
+                    if (direction == 1)
+                    {
+                        isOutput = true;
+                    }
+
+                    sides.Add(new StoredTxAddress(address, value, n, isOutput));
+
+                    pending = addrRows.Read();
+                    if (pending)
+                    {
+                        addrRows.GetBytes(0, 0, pendingTxid, 0, 32);
+                    }
+                }
+
+                if (sides.Count == 0)
+                {
+                    throw new InvalidDataException(
+                        "the transaction " + ToDisplayHex(txid) + " at height " + stored.Height
+                        + " has no rows in txaddr. Every transaction has at least one output and"
+                        + " every output was filed, so the two tables are no longer being read in"
+                        + " the same order and everything past this point would carry another"
+                        + " transaction's addresses");
+                }
+
+                stored.Addresses = sides.ToArray();
+                yield return stored;
+            }
+
+            // Rows nobody claimed. With the scans aligned there are none - both end on the same
+            // transaction - so any at all are the same failure as above, found from the other end.
+            long orphaned = 0;
+            while (pending)
+            {
+                orphaned++;
+                pending = addrRows.Read();
+            }
+
+            if (orphaned > 0)
+            {
+                throw new InvalidDataException(orphaned + " rows in txaddr belong to no transaction"
+                                               + " in tx below height " + heightLimit
+                                               + ", so the two tables do not describe the same run");
+            }
+        }
+
+        /// <summary>Whether two 32 byte txids are the same. Compared whole rather than by the
+        /// first eight bytes: this is what keeps the positional join honest, so it is the one
+        /// place where a shortcut would defeat the check it is there to make.</summary>
+        static bool SameTxid(byte[] left, byte[] right)
+        {
+            return left.AsSpan().SequenceEqual(right);
+        }
+
+        /// <summary>
+        /// The database in memory, in one list, in chain order.
+        ///
+        /// What this costs is worth knowing before calling it. A whole-chain file - the first
+        /// 200,000 blocks are about six gigabytes of it - is roughly seven million transactions
+        /// and thirty million address rows, and holding all of that lands somewhere around three
+        /// gigabytes of managed heap: a StoredTransaction and a 32 byte txid each, an array of
+        /// sides each, twenty four bytes per side, and one shared string per distinct address. The
+        /// summary prints what it actually took, which is the number to trust over that estimate.
+        ///
+        /// The alternative is StreamAllTransactionsFromSqlite, which hands them over one at a time
+        /// and holds nothing. Anything that walks the chain once - balances, a search for an
+        /// address, counting - wants the stream. This is for the second and third pass, where
+        /// paying the read once beats reading six gigabytes off the disk again.
+        /// </summary>
+        /// <param name="dbPath">The file SaveAllTransactionsToSqlite wrote.</param>
+        /// <param name="heightLimit">Stop before this height, so 200000 means the first 200,000
+        /// blocks: heights 0 to 199999.</param>
+        public static List<StoredTransaction> LoadAllTransactionsFromSqlite(string dbPath, int heightLimit)
+        {
+            var file = new FileInfo(dbPath);
+            Console.WriteLine("loading transactions from " + dbPath + ", "
+                              + (file.Length / 1024.0 / 1024.0 / 1024.0).ToString("F2") + " GB:");
+
+            long beforeHeap = GC.GetTotalMemory(false);
+            var clock = Stopwatch.StartNew();
+
+            // Seven million is where this ends up on a whole-chain file, and growing a list into
+            // that copies its way through fourteen million entries on the doublings. A million up
+            // front costs eight megabytes and skips most of it.
+            var loaded = new List<StoredTransaction>(1024 * 1024);
+
+            long inputRows = 0;
+            long outputRows = 0;
+            long coinbases = 0;
+            long unresolvedInputs = 0;
+            long outputsWithNoAddress = 0;
+            long spentWithNoAddress = 0;
+            int firstHeight = -1;
+            int lastHeight = -1;
+            int outOfOrder = 0;
+
+            foreach (StoredTransaction tx in StreamAllTransactionsFromSqlite(dbPath, heightLimit))
+            {
+                if (firstHeight < 0)
+                {
+                    firstHeight = tx.Height;
+                }
+
+                // The order everything downstream depends on, checked while it is free. A height
+                // that goes backwards says the file was not written by a walk in chain order, and
+                // a balance built from it would be wrong with nothing about it to say so.
+                if (tx.Height < lastHeight)
+                {
+                    outOfOrder++;
+                }
+                lastHeight = tx.Height;
+
+                bool coinbase = true;
+                foreach (StoredTxAddress side in tx.Addresses)
+                {
+                    if (side.IsOutput)
+                    {
+                        outputRows++;
+                        if (side.Address == null)
+                        {
+                            outputsWithNoAddress++;
+                        }
+                        continue;
+                    }
+
+                    coinbase = false;
+                    inputRows++;
+
+                    if (side.Value < 0)
+                    {
+                        unresolvedInputs++;
+                    }
+                    else if (side.Address == null)
+                    {
+                        spentWithNoAddress++;
+                    }
+                }
+
+                if (coinbase)
+                {
+                    coinbases++;
+                }
+
+                loaded.Add(tx);
+
+                // Same cadence the writer prints at, for the same reason: this is long enough that
+                // a console saying nothing is indistinguishable from a hung one.
+                if (loaded.Count % 500000 == 0)
+                {
+                    Console.WriteLine("  " + loaded.Count + " transactions, height " + tx.Height
+                                      + ", " + clock.Elapsed.TotalSeconds.ToString("F0") + "s");
+                }
+            }
+
+            clock.Stop();
+
+            long heap = GC.GetTotalMemory(false) - beforeHeap;
+
+            Console.WriteLine("  transactions : " + loaded.Count + " in "
+                              + clock.Elapsed.TotalSeconds.ToString("F1") + "s");
+            Console.WriteLine("  heights      : " + firstHeight + " to " + lastHeight
+                              + ", " + coinbases + " coinbases");
+            Console.WriteLine("  address rows : " + (inputRows + outputRows) + ", "
+                              + inputRows + " spending and " + outputRows + " paying");
+            Console.WriteLine("  held         : " + (heap / 1024.0 / 1024.0 / 1024.0).ToString("F2")
+                              + " GB of managed heap");
+
+            if (outputsWithNoAddress > 0)
+            {
+                Console.WriteLine("  no address   : " + outputsWithNoAddress
+                                  + " outputs pay a script with no address in it, "
+                                  + spentWithNoAddress + " of them later spent");
+            }
+
+            if (unresolvedInputs > 0)
+            {
+                Console.WriteLine("  unresolved   : " + unresolvedInputs
+                                  + " inputs have no address in the file - the run that wrote it"
+                                  + " never saw the output they spend, so nothing reading it back"
+                                  + " can attribute them either");
+            }
+
+            if (outOfOrder > 0)
+            {
+                Console.WriteLine("  OUT OF ORDER : " + outOfOrder
+                                  + " transactions came back at a lower height than the one before"
+                                  + " them - the file was not written in chain order");
+            }
+
+            if (firstHeight > 0)
+            {
+                Console.WriteLine("  PARTIAL      : the file starts at height " + firstHeight
+                                  + " rather than 0, so balances taken off it are missing whatever"
+                                  + " those blocks paid");
+            }
+
+            return loaded;
+        }
+
+        /// <summary>
+        /// The same address table as CollectAddressBalances and CollectAddressBalancesFromTransactions,
+        /// built out of the database instead of out of the chain.
+        ///
+        /// This is the cheap one, and it is the reason the database is worth writing. Both of the
+        /// others carry a UTXO set - every unspent output in the chain, held so that an input can
+        /// be told whose coins it moves - because an input names an outpoint and nothing else. The
+        /// writer had that set in hand and put the answer in the row, so this walk needs no set, no
+        /// outpoints and no lookup at all: a direction 0 row already says which address is being
+        /// debited and by how much, and a direction 1 row says who is being paid.
+        ///
+        /// The rules are otherwise the ones CollectAddressBalances documents at length - mining
+        /// rewards are outputs like any other, scripts with no address are counted rather than
+        /// hidden, and the reconciliation at the end says mined less fees equals what the balances
+        /// hold plus what sits in scripts nobody can name.
+        ///
+        /// What it cannot do is check itself the way the other two do. They rebuild every address
+        /// from the block bytes; this inherits whatever the writer resolved, and would repeat the
+        /// writer's mistakes without noticing. CompareAddressBalances against the block walk is
+        /// what makes it trustworthy - two tables built from the same chain by routines sharing no
+        /// code, agreeing on several million addresses.
+        /// </summary>
+        /// <param name="transactions">Every transaction once, in chain order, out of the file.</param>
+        /// <param name="heightLimit">Stop before this height, so 200000 means heights 0 to 199999.</param>
+        /// <param name="csvPath">Where to write the full table, or null to only return it. The
+        /// whole chain is a 350 MB file, so this is worth passing null for while iterating.</param>
+        public static List<AddressBalance> CollectAddressBalancesFromStoredTransactions(
+            List<StoredTransaction> transactions, int heightLimit, string? csvPath)
+        {
+            var balances = new Dictionary<string, AddressBalance>();
+
+            long transactionOrdinal = 0;
+            int walked = 0;
+            int unresolvedInputs = 0;
+            int lastHeight = -1;
+            int outOfOrder = 0;
+
+            ulong mined = 0;
+            ulong fees = 0;
+
+            // The two ends of what nobody can be credited with: paid into scripts with no address
+            // in them, and taken back out again by something spending one. What is left is still
+            // sitting there, and is the term that makes the reconciliation add up.
+            ulong paidToNoAddress = 0;
+            ulong spentFromNoAddress = 0;
+
+            var clock = Stopwatch.StartNew();
+
+            foreach (StoredTransaction tx in transactions)
+            {
+                if (tx.Height >= heightLimit)
+                {
+                    continue;
+                }
+
+                if (tx.Height < lastHeight)
+                {
+                    outOfOrder++;
+                }
+                lastHeight = tx.Height;
+
+                transactionOrdinal++;
+                walked++;
+
+                bool coinbase = true;
+                ulong spent = 0;
+                ulong created = 0;
+
+                foreach (StoredTxAddress side in tx.Addresses)
+                {
+                    if (!side.IsOutput)
+                    {
+                        // An input, and the address on it belongs to the output being spent -
+                        // looked up when the file was written, which is the whole saving here.
+                        coinbase = false;
+
+                        if (side.Value < 0)
+                        {
+                            unresolvedInputs++;
+                            continue;
+                        }
+
+                        spent += (ulong)side.Value;
+
+                        if (side.Address == null)
+                        {
+                            spentFromNoAddress += (ulong)side.Value;
+                            continue;
+                        }
+
+                        AddressBalance from = Touch(balances, side.Address, tx.Height,
+                                                    transactionOrdinal);
+                        from.Balance -= side.Value;
+                        continue;
+                    }
+
+                    created += (ulong)side.Value;
+
+                    if (side.Address == null)
+                    {
+                        paidToNoAddress += (ulong)side.Value;
+                        continue;
+                    }
+
+                    AddressBalance to = Touch(balances, side.Address, tx.Height, transactionOrdinal);
+                    to.Balance += side.Value;
+                }
+
+                // A coinbase pays out the subsidy and the fees of every other transaction in its
+                // block together, so what it creates is the block's whole payment. Everything else
+                // spends more than it creates, and the difference is the fee that comes back in
+                // that coinbase.
+                if (coinbase)
+                {
+                    mined += created;
+                }
+                else if (spent >= created)
+                {
+                    fees += spent - created;
+                }
+            }
+
+            clock.Stop();
+
+            var list = new List<AddressBalance>(balances.Count);
+            long balanceTotal = 0;
+            int negative = 0;
+
+            foreach (KeyValuePair<string, AddressBalance> entry in balances)
+            {
+                list.Add(entry.Value);
+                balanceTotal += entry.Value.Balance;
+                if (entry.Value.Balance < 0)
+                {
+                    negative++;
+                }
+            }
+
+            list.Sort((a, b) =>
+            {
+                if (a.Balance != b.Balance)
+                {
+                    return b.Balance.CompareTo(a.Balance);
+                }
+                return string.CompareOrdinal(a.Address, b.Address);
+            });
+
+            Console.WriteLine("address balances from " + transactions.Count
+                              + " stored transactions, below height " + heightLimit + ":");
+            Console.WriteLine("  transactions : " + walked + " walked in "
+                              + clock.Elapsed.TotalSeconds.ToString("F1") + "s");
+            Console.WriteLine("  addresses    : " + list.Count);
+            Console.WriteLine("  mined        : " + (mined / 100000000.0).ToString("F8")
+                              + " BTC paid out by coinbases, fees included");
+            Console.WriteLine("  balances     : " + (balanceTotal / 100000000.0).ToString("F8") + " BTC held");
+
+            if (outOfOrder > 0)
+            {
+                Console.WriteLine("  OUT OF ORDER : " + outOfOrder
+                                  + " transactions arrived at a lower height than the one before"
+                                  + " them - the file is not in chain order and the balances are wrong");
+            }
+
+            if (unresolvedInputs > 0)
+            {
+                Console.WriteLine("  unresolved   : " + unresolvedInputs
+                                  + " inputs have no address in the file, so the balances above"
+                                  + " them are too high by whatever those inputs spent");
+            }
+            else
+            {
+                ulong unattributed = paidToNoAddress - spentFromNoAddress;
+
+                long expected = (long)mined - (long)fees;
+                long actual = balanceTotal + (long)unattributed;
+
+                Console.WriteLine("  fees         : " + (fees / 100000000.0).ToString("F8")
+                                  + " BTC spent but not paid out, re-mined inside the coinbases");
+                Console.WriteLine("  unattributed : " + (unattributed / 100000000.0).ToString("F8")
+                                  + " BTC unspent in scripts with no address");
+
+                if (expected == actual)
+                {
+                    Console.WriteLine("  reconciles   : mined - fees == balances + unattributed");
+                }
+                else
+                {
+                    Console.WriteLine("  MISMATCH     : mined - fees is " + expected
+                                      + " sats, balances + unattributed is " + actual
+                                      + ", off by " + (expected - actual));
+                }
+            }
+
+            if (negative > 0)
+            {
+                Console.WriteLine("  negative     : " + negative
+                                  + " addresses spent more than they were paid, which cannot happen"
+                                  + " on a file that started at height 0");
+            }
+
+            int show = 20;
+            if (list.Count < show)
+            {
+                show = list.Count;
+            }
+
+            for (int i = 0; i < show; i++)
+            {
+                AddressBalance held = list[i];
+                Console.WriteLine("  " + held.Address.PadRight(35)
+                                  + (held.Balance / 100000000.0).ToString("F8").PadLeft(18) + " BTC"
+                                  + held.Transactions.ToString().PadLeft(8) + " txs"
+                                  + "  heights " + held.FirstHeight + " to " + held.LastHeight);
+            }
+
+            if (csvPath != null)
+            {
+                string? directory = Path.GetDirectoryName(csvPath);
+                if (directory != null)
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                using (var writer = new StreamWriter(csvPath, false))
+                {
+                    writer.WriteLine("address,balance,firstHeight,lastHeight,transactions");
+                    foreach (AddressBalance held in list)
+                    {
+                        writer.WriteLine(held.Address + "," + held.Balance + "," + held.FirstHeight
+                                         + "," + held.LastHeight + "," + held.Transactions);
+                    }
+                }
+
+                Console.WriteLine("  written      : " + csvPath + " (balance in satoshis)");
+            }
+
+            return list;
+        }
+
+        // ------------------------------------------------------------------------------------
         // headers.dat - the header chain MainBlockDownload caches, in height order
         // ------------------------------------------------------------------------------------
 
@@ -3508,5 +8204,316 @@ Examples:
                     return prefix;
             }
         }
+    
+
+    
+        // walletsFromList2 is the table the caller built somewhere else - off the database, or off
+        // a collected list - and is a parameter because the comparison at the bottom of this
+        // method wants it. It was left behind when this method was split out of the one above and
+        // stopped compiling; null means there is nothing to compare against, which is what the
+        // check down there is for.
+        static int DeleteLater(List<BlockRaw> loadedBlocks, List<Transaction> allTransactions,
+                               List<AddressBalance>? walletsFromList2)
+        {
+
+            if (false)
+            {
+                // load rocksdb blocks
+                //
+                // The branch above earns this one: it walked the blk files, worked out which
+                // blocks form the longest chain and in what order, and wrote that out. So there is
+                // no scanning, no chain to rebuild and nothing to sort here - the blocks come back
+                // in height order because that is how they were filed.
+                // One store per run the branch above wrote - blocks1, blocks2, and so on, each
+                // holding up to 50,000 blocks in height order. Read back in the same order they
+                // were written they concatenate into one chain, which is what makes the link
+                // check further down worth running: it is then testing the seams between the
+                // stores as well as the blocks inside each one.
+                string rocksDbBase = "C:\\btcblock\\rocksdb\\blocks";
+
+                // Counted first, and on its own: this is Directory.Exists until one is missing,
+                // so however many runs were written is however many get read - there is no count
+                // here to keep in step with the writer. Opening them is the expensive part and
+                // that happens below, once this knows how many there are to open.
+                int stores = 0;
+                while (Directory.Exists(rocksDbBase + (stores + 1)))
+                {
+                    stores++;
+                }
+
+                if (stores == 0)
+                {
+                    Console.Error.WriteLine("no stores found - looked for " + rocksDbBase + "1");
+                    Console.Error.WriteLine("set rocksDbloaded2 to false to build them from the blk files first");
+                    return 1;
+                }
+
+                List<BlockRaw> loaded2;
+                try
+                {
+                    var loadClock = Stopwatch.StartNew();
+
+                    // One store per thread. They are separate databases in separate directories
+                    // sharing no handle, and LoadBlocksFromRocksDb keeps everything it touches
+                    // local - its list, its options, its RocksDb and its iterator are all created
+                    // inside the call. So the only thing crossing threads is the array each
+                    // result is dropped into, and every task owns one slot of it.
+                    //
+                    // Worth doing because most of the cost is not the disk: every block is
+                    // re-hashed on the way out to check it against the hash it is filed under,
+                    // which is CPU work that scales rather than queueing behind one disk head.
+                    var perStore = new List<BlockRaw>[stores];
+                    var summary = new string[stores];
+
+                    Parallel.For(0, stores, i =>
+                    {
+                        string storePath = rocksDbBase + (i + 1);
+                        List<BlockRaw> fromStore = LoadBlocksFromRocksDb(storePath);
+                        perStore[i] = fromStore;
+
+                        // Built here, printed below in store order. Writing to the console from
+                        // inside the loop would put the lines down in whatever order the threads
+                        // happened to finish, which reads like the stores are out of order.
+                        if (fromStore.Count == 0)
+                        {
+                            summary[i] = "  " + Path.GetFileName(storePath) + " : empty";
+                        }
+                        else
+                        {
+                            summary[i] = "  " + Path.GetFileName(storePath) + " : " + fromStore.Count
+                                         + " blocks, heights " + fromStore[0].BlockIndex
+                                         + " to " + fromStore[fromStore.Count - 1].BlockIndex;
+                        }
+                    });
+
+                    loadClock.Stop();
+
+                    foreach (string line in summary)
+                    {
+                        Console.WriteLine(line);
+                    }
+
+                    // Joined back up in store order, which is height order - the threads finish in
+                    // whatever order they like but nothing reads perStore until they are all done.
+                    // Sized up front so the list does not copy its whole array every time it grows
+                    // past a couple of hundred thousand entries.
+                    int total = 0;
+                    foreach (List<BlockRaw> fromStore in perStore)
+                    {
+                        total += fromStore.Count;
+                    }
+
+                    loaded2 = new List<BlockRaw>(total);
+                    foreach (List<BlockRaw> fromStore in perStore)
+                    {
+                        loaded2.AddRange(fromStore);
+                    }
+
+                    Console.WriteLine("rocksdb loaded2: " + loaded2.Count + " blocks from " + stores
+                                      + " stores in " + loadClock.Elapsed.TotalSeconds.ToString("F2") + "s");
+                }
+                catch (AggregateException ex)
+                {
+                    // Parallel.For collects everything that threw and hands it back in one of
+                    // these, whose own Message is just "One or more errors occurred" - the part
+                    // worth reading is inside it.
+                    Console.Error.WriteLine("could not load the stores:");
+                    foreach (Exception inner in ex.Flatten().InnerExceptions)
+                    {
+                        Console.Error.WriteLine("  " + inner.Message);
+                    }
+                    Console.Error.WriteLine("set rocksDbloaded2 to false to build them from the blk files first");
+                    return 1;
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine("could not load the stores: " + ex.Message);
+                    Console.Error.WriteLine("set rocksDbloaded2 to false to build them from the blk files first");
+                    return 1;
+                }
+
+                if (loaded2.Count == 0)
+                {
+                    Console.Error.WriteLine("the store is empty - nothing to work with");
+                    return 1;
+                }
+
+                Console.WriteLine("  first      : height " + loaded2[0].BlockIndex + " " + loaded2[0].DisplayHash);
+                Console.WriteLine("  last       : height " + loaded2[loaded2.Count - 1].BlockIndex
+                                  + " " + loaded2[loaded2.Count - 1].DisplayHash);
+
+                // The blocks were stored in chain order, so this is checking the store kept it -
+                // every block's parent should be the one before it, with no gap in the heights.
+                int brokenLinks = 0;
+                for (int i = 1; i < loaded2.Count; i++)
+                {
+                    if (loaded2[i].GetPrevBlockHash() != loaded2[i - 1].DisplayHash)
+                    {
+                        brokenLinks++;
+                        if (brokenLinks <= 5)
+                        {
+                            Console.Error.WriteLine("  break at height " + loaded2[i].BlockIndex
+                                                    + ": parent is " + loaded2[i].GetPrevBlockHash()
+                                                    + ", previous block is " + loaded2[i - 1].DisplayHash);
+                        }
+                    }
+                }
+
+
+                if (brokenLinks == 0)
+                {
+                    Console.WriteLine("  chain      : all " + (loaded2.Count - 1) + " links hold");
+                }
+                else
+                {
+                    Console.WriteLine("  chain      : " + brokenLinks + " broken links");
+                }
+            }
+
+            // write code here to use the - to — txaddr direction 1, one row per output, address straight out of ScriptToAddress(output.ScriptPubKey) (MainBlockHex.cs:4372).
+            // -from — direction 0, one row per non-coinbase input, address taken from the unspent entry the input's outpoint points at (MainBlockHex.cs:4347).
+            // also include the mining rewards
+
+            //  write code here to keep the balance of everywallet that sees transaction in the first 200,000 blocks, and write it to a csv file with columns: address, balance, first seen height, last seen height, number of transactions seen.  The balance is the sum of all outputs to that address minus the sum of all inputs from that address.  The first seen height is the height of the first block that contains a transaction that has an output to that address or an input from that address.  The last seen height is the height of the last block that contains a transaction that has an output to that address or an input from that address.  The number of transactions seen is the number of transactions that have an output to that address or an input from that address.
+            if (false)
+            {
+                const int balanceHeights = 200000;
+
+                // Beside the stores the blocks came out of, like everything else this file
+                // writes.
+                string balanceCsvPath = "C:\\btcblock\\rocksdb\\address_balances.csv";
+
+                // Both sides of every transaction and the mining rewards with them - a
+                // coinbase output is an output, so the 50 BTC a block pays is credited to the
+                // miner by the same code that credits a payment. The reconciliation it prints
+                // at the end is the thing to read first: with nothing unresolved, what was
+                // mined less what was burnt as fees has to equal what the balances hold, and
+                // if it does then no output went missing anywhere in the walk.
+                var walletClock = Stopwatch.StartNew();
+                List<AddressBalance> wallets = CollectAddressBalances(loadedBlocks, balanceHeights, balanceCsvPath);
+                walletClock.Stop();
+
+                // How much of that table is one payment that never moved again. Through this
+                // era most of it is: an address was a single transaction's worth of coins and
+                // then nothing.
+                int untouchedSince = 0;
+                foreach (AddressBalance held in wallets)
+                {
+                    if (held.Transactions == 1)
+                    {
+                        untouchedSince++;
+                    }
+                }
+
+                Console.WriteLine("  one tx only  : " + untouchedSince + " addresses were touched exactly once");
+                Console.WriteLine("  walked in    : " + walletClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+
+                // Two independent walks over the same chain, one off the blocks and one off
+                // the collected transactions. They have to come to the same table, and where
+                // they do not the differences say which of them to distrust.
+                if (walletsFromList2 != null)
+                {
+                    CompareAddressBalances(walletsFromList2, "from list", wallets, "from blocks");
+                }
+            }
+
+
+            if (false)
+            {
+                // generate a list of all the wallet addresses that get the 50 BTC block reward in
+                // the first 200,000 blocks
+                //
+                // 200,000 is short of the first halving at 210,000, so every block in the range
+                // still carries a 50 BTC subsidy and there is nothing to filter on but height.
+                // If the stores hold fewer blocks than that the list simply covers what is there,
+                // and the block count it prints says how many it actually read.
+                {
+                    const int rewardHeights = 200000;
+
+                    // Beside the stores the blocks came out of. Every other absolute path in this
+                    // file points into C:\btcblock, so this one does too rather than inventing a
+                    // second place for output to live.
+                    string rewardCsvPath = "C:\\btcblock\\rocksdb\\coinbase_addresses.csv";
+
+                    var rewardClock = Stopwatch.StartNew();
+                    List<CoinbaseReward> rewards = CollectCoinbaseAddresses(loadedBlocks, rewardHeights, rewardCsvPath);
+                    rewardClock.Stop();
+
+                    // The shape of early mining in one number: through this range most addresses
+                    // are somebody who found a single block and was never seen again.
+                    int oneBlockOnly = 0;
+                    foreach (CoinbaseReward reward in rewards)
+                    {
+                        if (reward.Blocks == 1)
+                        {
+                            oneBlockOnly++;
+                        }
+                    }
+
+                    Console.WriteLine("  one block    : " + oneBlockOnly + " addresses were paid exactly once");
+                    Console.WriteLine("  read in      : " + rewardClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+                }
+            }
+
+
+            if (false)
+            {
+
+                // use sqllite to save the transactions with an index on from address and to address
+
+                // save the transactions from the first 50,000 blocks into C:\\btcblock\\rocksdb\\transactions1
+                // save the transactions from the second 50,000 blocks into C:\\btcblock\\rocksdb\\transactions2 and so on
+
+                string txDbBase = "C:\\btcblock\\rocksdb\\transactions";
+
+                // Cut the same way the block stores were: 50,000 blocks each, in order, so
+                // transactions1.db covers the same heights as blocks1.
+                //
+                // ".db" on the end because a SQLite database is a file while a rocksdb store is a
+                // directory, and everything else under this folder is the latter - a bare
+                // "transactions1" would be a file sitting where this codebase expects a store.
+                const int sqliteSegmentBlocks = 50000;
+
+                // Carried across every segment, which is what makes the from-address work: an
+                // input in segment 4 routinely spends an output made in segment 1, and only a set
+                // that has been walking along since height 0 still knows who owned it. Outputs go
+                // in and spends take them out, so this stays the size of the UTXO set at whatever
+                // height the walk has reached, not a record of every output ever made.
+                //
+                // Keyed by a struct, so the entries live in the dictionary's own storage and the
+                // set costs no per-outpoint allocation.
+                var unspent = new Dictionary<OutPoint, UnspentOutput>();
+
+                int sqliteStore = 0;
+                long sqliteTotal = 0;
+                var sqliteClock = Stopwatch.StartNew();
+
+                for (int start = 0; start < loadedBlocks.Count; start += sqliteSegmentBlocks)
+                {
+                    sqliteStore++;
+                    int take = Math.Min(sqliteSegmentBlocks, loadedBlocks.Count - start);
+                    List<BlockRaw> segmentBlocks = loadedBlocks.GetRange(start, take);
+
+                    string sqlitePath = txDbBase + sqliteStore + ".db";
+                    Console.WriteLine("transactions " + sqliteStore + ": blocks " + segmentBlocks[0].BlockIndex
+                                      + " to " + segmentBlocks[take - 1].BlockIndex + " -> " + sqlitePath);
+
+                    var oneDbClock = Stopwatch.StartNew();
+                    sqliteTotal += SaveTransactionsToSqlite(sqlitePath, segmentBlocks, unspent);
+                    oneDbClock.Stop();
+
+                    Console.WriteLine("  wrote in     : " + oneDbClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+                }
+
+                sqliteClock.Stop();
+                Console.WriteLine("indexed " + sqliteTotal + " transactions across " + sqliteStore
+                                  + " databases in " + sqliteClock.Elapsed.TotalSeconds.ToString("F1") + "s");
+
+
+            }
+
+            return 0;
+        }
+
     }
 }
